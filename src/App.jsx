@@ -596,38 +596,40 @@ export default function App() {
             </div>
           </header>
 
+          {/* Center Main Stage: Puzzle Board + Wheel */}
           <main className="my-6 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center z-10">
+            {/* Left / Center Column: Puzzle Letter Board */}
             <div className="lg:col-span-8 flex flex-col items-center justify-center">
+              
+              {/* Puzzle Display Matrix */}
               <div className="w-full bg-[#003865]/90 border-4 border-[#78BE21]/60 rounded-3xl p-6 sm:p-8 shadow-[0_0_50px_rgba(120,190,33,0.15)] backdrop-blur">
-                <div className="flex flex-wrap justify-center gap-2 sm:gap-3 max-w-4xl mx-auto">
+                <div className="flex flex-wrap justify-center items-center gap-2 max-w-4xl mx-auto">
                   {words.map((word, wordIdx) => (
-                    <div key={wordIdx} className="flex gap-1.5 sm:gap-2 my-1">
-                      {word.split('').map((char, charIdx) => {
-                        const isRevealed = gameState.guessedLetters.includes(char) || !ALPHABET.includes(char);
-                        return (
-                          <div
-                            key={charIdx}
-                            className={`w-9 h-12 sm:w-12 sm:h-16 border-2 flex items-center justify-center font-black text-xl sm:text-3xl rounded-lg shadow-inner transition-all duration-500 transform ${
-                              !ALPHABET.includes(char)
-                                ? 'bg-transparent border-transparent text-[#78BE21]'
-                                : isRevealed
-                                ? 'bg-white border-[#005B2B] text-[#003865] shadow-md scale-100 rotate-0'
-                                : 'bg-[#005B2B]/90 border-[#78BE21]/40 text-transparent scale-95'
-                            }`}
-                          >
-                            {isRevealed ? char : ''}
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <React.Fragment key={wordIdx}>
+                      <div className="flex gap-1.5 my-1 shrink-0">
+                        {word.split('').map((char, charIdx) => {
+                          const isRevealed = gameState.guessedLetters.includes(char) || !ALPHABET.includes(char);
+                          return (
+                            <div
+                              key={charIdx}
+                              className={`w-8 h-11 sm:w-11 sm:h-15 border-2 flex items-center justify-center font-black text-lg sm:text-2xl rounded-lg shadow-inner transition-all duration-500 transform ${
+                                !ALPHABET.includes(char)
+                                  ? 'bg-transparent border-transparent text-[#78BE21]'
+                                  : isRevealed
+                                  ? 'bg-white border-[#005B2B] text-[#003865] shadow-md scale-100 rotate-0'
+                                  : 'bg-[#005B2B]/90 border-[#78BE21]/40 text-transparent scale-95'
+                              }`}
+                            >
+                              {isRevealed ? char : ''}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {wordIdx < words.length - 1 && (
+                        <div className="w-4 sm:w-6 h-11 sm:h-15 inline-block shrink-0" />
+                      )}
+                    </React.Fragment>
                   ))}
-                </div>
-              </div>
-
-              <div className="mt-6 w-full bg-[#003865]/80 border border-[#008EAA]/40 rounded-2xl p-4 text-center shadow-lg">
-                <div className="text-xs font-bold text-[#78BE21] uppercase tracking-wider mb-1">Status Log</div>
-                <div className="text-lg sm:text-xl font-bold text-white animate-pulse">
-                  {gameState.lastActionText}
                 </div>
               </div>
             </div>
