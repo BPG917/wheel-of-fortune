@@ -274,11 +274,12 @@ export default function App() {
     prevGameStateRef.current = gameState;
   }, [gameState, viewMode]);
 
-  // Current Puzzle Object
-  const currentPuzzle = gameState.puzzles[gameState.activePuzzleIndex] || {
-    phrase: 'TRAINING PUZZLE',
-    category: 'DEFAULT',
-    hint: 'No puzzle set'
+  // Current Active Puzzle Object (Safely dynamic & reactive)
+  const safeActiveIndex = Math.min(gameState.activePuzzleIndex || 0, (gameState.puzzles?.length || 1) - 1);
+  const currentPuzzle = gameState.puzzles?.[safeActiveIndex] || {
+    phrase: 'SAFETY FIRST ALWAYS',
+    category: 'WASHINGTON COUNTY CULTURE',
+    hint: 'Priority in the workplace'
   };
 
   // Active Player
@@ -506,8 +507,8 @@ export default function App() {
   // ==========================================
   // ROOT RENDERER (INLINE VIEWS TO PRESERVE DOM FOCUS)
   // ==========================================
-  const phrase = currentPuzzle.phrase.toUpperCase();
-  const words = phrase.split(' ');
+  const phrase = (currentPuzzle.phrase || '').trim().toUpperCase();
+  const words = phrase ? phrase.split(/\s+/) : [];
   const isMyTurn = gameState.players[gameState.activePlayerIndex]?.id === selectedPlayerId;
   const playerObj = gameState.players.find((p) => p.id === selectedPlayerId) || gameState.players[0];
   const canSpin = isMyTurn && (gameState.status === 'idle' || gameState.status === 'landed');
