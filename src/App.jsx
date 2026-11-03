@@ -500,738 +500,15 @@ export default function App() {
   };
 
   // ==========================================
-  // SUB-COMPONENTS FOR VIEWS
+  // ROOT RENDERER (INLINE VIEWS TO PRESERVE DOM FOCUS)
   // ==========================================
+  const phrase = currentPuzzle.phrase.toUpperCase();
+  const words = phrase.split(' ');
+  const isMyTurn = gameState.players[gameState.activePlayerIndex]?.id === selectedPlayerId;
+  const playerObj = gameState.players.find((p) => p.id === selectedPlayerId) || gameState.players[0];
+  const canSpin = isMyTurn && (gameState.status === 'idle' || gameState.status === 'landed');
+  const canPickLetter = isMyTurn && gameState.status === 'landed' && typeof gameState.currentSpinValue === 'number';
 
-  // 1. DISPLAY VIEW (Big Screen TV Projector View)
-  const DisplayView = () => {
-    const phrase = currentPuzzle.phrase.toUpperCase();
-    const words = phrase.split(' ');
-
-    return (
-      <div className="min-h-screen bg-[#071927] text-white flex flex-col justify-between p-4 sm:p-6 overflow-hidden relative font-sans">
-        {/* Ambient glow effects with Washington County Green & Blue */}
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#005B2B]/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#008EAA]/20 rounded-full blur-3xl pointer-events-none" />
-
-        {/* Top Header Bar */}
-        <header className="flex flex-col sm:flex-row justify-between items-center bg-[#003865]/90 border border-[#008EAA]/40 rounded-2xl p-4 shadow-2xl backdrop-blur gap-4 z-10">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-[#78BE21]/20 text-[#78BE21] rounded-xl border border-[#78BE21]/30">
-              <Trophy className="w-8 h-8 animate-pulse" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-black tracking-wider text-white">
-                WASHINGTON COUNTY
-              </h1>
-              <p className="text-xs text-[#78BE21] uppercase tracking-widest font-extrabold">Training & Learning Wheel</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 bg-[#071927] px-6 py-2.5 rounded-xl border border-[#003865]">
-            <div className="text-right">
-              <div className="text-xs text-slate-400 font-semibold uppercase">Category</div>
-              <div className="text-lg font-bold text-[#78BE21]">{currentPuzzle.category}</div>
-            </div>
-            {currentPuzzle.hint && (
-              <div className="hidden lg:block border-l border-slate-800 pl-4 text-left">
-                <div className="text-xs text-slate-400 font-semibold uppercase">Hint</div>
-                <div className="text-sm text-slate-200 italic">{currentPuzzle.hint}</div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => updateGame({ soundEnabled: !gameState.soundEnabled })}
-              className="p-2.5 rounded-xl bg-[#003865] hover:bg-[#008EAA] text-white border border-slate-700 transition"
-              title="Toggle Audio SFX"
-            >
-              {gameState.soundEnabled ? <Volume2 className="w-5 h-5 text-[#78BE21]" /> : <VolumeX className="w-5 h-5 text-rose-400" />}
-            </button>
-            <div className="text-xs font-mono bg-[#071927] px-3 py-2 rounded-xl text-slate-300 border border-[#003865]">
-              ROUND {gameState.activePuzzleIndex + 1} / {gameState.puzzles.length}
-            </div>
-          </div>
-        </header>
-
-        {/* Center Main Stage: Puzzle Board + Wheel */}
-        <main className="my-6 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center z-10">
-          
-          {/* Left / Center Column: Puzzle Letter Board */}
-          <div className="lg:col-span-8 flex flex-col items-center justify-center">
-            
-            {/* Puzzle Display Matrix */}
-            <div className="w-full bg-[#003865]/90 border-4 border-[#78BE21]/60 rounded-3xl p-6 sm:p-8 shadow-[0_0_50px_rgba(120,190,33,0.15)] backdrop-blur">
-              <div className="flex flex-wrap justify-center gap-2 sm:gap-3 max-w-4xl mx-auto">
-                {words.map((word, wordIdx) => (
-                  <div key={wordIdx} className="flex gap-1.5 sm:gap-2 my-1">
-                    {word.split('').map((char, charIdx) => {
-                      const isRevealed = gameState.guessedLetters.includes(char) || !ALPHABET.includes(char);
-                      return (
-                        <div
-                          key={charIdx}
-                          className={`w-9 h-12 sm:w-12 sm:h-16 border-2 flex items-center justify-center font-black text-xl sm:text-3xl rounded-lg shadow-inner transition-all duration-500 transform ${
-                            !ALPHABET.includes(char)
-                              ? 'bg-transparent border-transparent text-[#78BE21]'
-                              : isRevealed
-                              ? 'bg-white border-[#005B2B] text-[#003865] shadow-md scale-100 rotate-0'
-                              : 'bg-[#005B2B]/90 border-[#78BE21]/40 text-transparent scale-95'
-                          }`}
-                        >
-                          {isRevealed ? char : ''}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Turn Announcement Banner */}
-            <div className="mt-6 w-full bg-[#003865]/80 border border-[#008EAA]/40 rounded-2xl p-4 text-center shadow-lg">
-              <div className="text-xs font-bold text-[#78BE21] uppercase tracking-wider mb-1">Status Log</div>
-              <div className="text-lg sm:text-xl font-bold text-white animate-pulse">
-                {gameState.lastActionText}
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column: Clean SVG Wheel */}
-          <div className="lg:col-span-4 flex flex-col items-center justify-center">
-            <div className="relative w-64 h-64 sm:w-80 sm:h-80 flex items-center justify-center">
-              
-              {/* Top Wheel Arrow Pointer */}
-              <div className="absolute -top-3 z-30 w-0 h-0 border-l-[16px] border-l-transparent border-r-[16px] border-r-transparent border-t-[32px] border-t-[#78BE21] drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]" />
-
-              {/* The Spinning Canvas SVG */}
-              <div
-                className="w-full h-full rounded-full shadow-[0_0_40px_rgba(0,0,0,0.9)] border-8 border-[#003865] overflow-hidden relative transition-transform ease-out"
-                style={{
-                  transform: `rotate(${gameState.wheelRotation}deg)`,
-                  transitionDuration: gameState.status === 'spinning' ? '3.2s' : '0s'
-                }}
-              >
-                <svg viewBox="0 0 100 100" className="w-full h-full">
-                  {WHEEL_WEDGES.map((wedge, idx) => {
-                    const angle = 360 / WHEEL_WEDGES.length;
-                    const startAngle = idx * angle;
-                    const endAngle = (idx + 1) * angle;
-                    
-                    const x1 = 50 + 50 * Math.cos((Math.PI * startAngle) / 180);
-                    const y1 = 50 + 50 * Math.sin((Math.PI * startAngle) / 180);
-                    const x2 = 50 + 50 * Math.cos((Math.PI * endAngle) / 180);
-                    const y2 = 50 + 50 * Math.sin((Math.PI * endAngle) / 180);
-
-                    const pathData = `M 50 50 L ${x1} ${y1} A 50 50 0 0 1 ${x2} ${y2} Z`;
-                    const textAngle = startAngle + angle / 2;
-
-                    // Dynamic text sizing & inner placement to prevent overlaps
-                    const isLongText = wedge.label.length > 5;
-                    const fontSize = isLongText ? "3.2" : "4.8";
-                    const textRadius = isLongText ? 31 : 33;
-
-                    return (
-                      <g key={idx}>
-                        <path d={pathData} fill={wedge.color} stroke="#003865" strokeWidth="0.5" />
-                        <text
-                          x="50"
-                          y={50 - textRadius}
-                          fill={wedge.text}
-                          fontSize={fontSize}
-                          fontWeight="900"
-                          letterSpacing={isLongText ? "-0.2" : "0"}
-                          dominantBaseline="central"
-                          textAnchor="middle"
-                          transform={`rotate(${textAngle + 90}, 50, 50)`}
-                        >
-                          {wedge.label}
-                        </text>
-                      </g>
-                    );
-                  })}
-                  <circle cx="50" cy="50" r="10" fill="#003865" stroke="#78BE21" strokeWidth="2" />
-                </svg>
-              </div>
-            </div>
-
-            {/* Current Spin Result Display */}
-            {gameState.currentSpinValue && (
-              <div className="mt-4 px-6 py-2 rounded-xl bg-[#78BE21] text-[#003865] font-black text-xl shadow-lg animate-bounce">
-                LANDED ON: {gameState.currentSpinValue}
-              </div>
-            )}
-          </div>
-        </main>
-
-        {/* Bottom Bar: Player Scoreboard & Used Letters */}
-        <footer className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch z-10">
-          
-          {/* Players Scoreboard */}
-          <div className="lg:col-span-8 bg-[#003865]/90 border border-[#008EAA]/40 rounded-2xl p-4 flex flex-wrap sm:flex-nowrap gap-4 justify-around items-center shadow-xl">
-            {gameState.players.map((p, idx) => {
-              const isActive = idx === gameState.activePlayerIndex;
-              return (
-                <div
-                  key={p.id}
-                  className={`flex-1 min-w-[140px] p-3 rounded-xl border transition-all ${
-                    isActive
-                      ? 'bg-[#005B2B] border-[#78BE21] shadow-[0_0_20px_rgba(120,190,33,0.3)] scale-105'
-                      : 'bg-[#071927]/80 border-slate-800 opacity-80'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
-                    <span className="font-bold text-sm truncate">{p.name}</span>
-                    {isActive && <span className="text-[10px] bg-[#78BE21] text-[#003865] px-1.5 py-0.5 rounded font-black">TURN</span>}
-                  </div>
-                  <div className="flex justify-between items-baseline mt-2">
-                    <div>
-                      <span className="text-[10px] text-slate-300 uppercase block">Round</span>
-                      <span className="text-xl font-extrabold text-[#78BE21]">${p.score}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-300 uppercase block">Total</span>
-                      <span className="text-sm font-bold text-slate-200">${p.totalScore}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Used Letters Board */}
-          <div className="lg:col-span-4 bg-[#003865]/90 border border-[#008EAA]/40 rounded-2xl p-4 shadow-xl flex flex-col justify-center">
-            <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 text-center">
-              Used Letters Board
-            </div>
-            <div className="flex flex-wrap justify-center gap-1">
-              {ALPHABET.map((char) => {
-                const isUsed = gameState.guessedLetters.includes(char);
-                return (
-                  <span
-                    key={char}
-                    className={`w-6 h-6 text-xs font-bold rounded flex items-center justify-center border ${
-                      isUsed
-                        ? 'bg-slate-900 border-slate-800 text-slate-600 line-through'
-                        : 'bg-[#005B2B] border-[#78BE21] text-white'
-                    }`}
-                  >
-                    {char}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        </footer>
-      </div>
-    );
-  };
-
-  // 2. PLAYER PHONE CONTROLLER VIEW
-  const PlayerView = () => {
-    const isMyTurn = gameState.players[gameState.activePlayerIndex]?.id === selectedPlayerId;
-    const playerObj = gameState.players.find((p) => p.id === selectedPlayerId) || gameState.players[0];
-    const canSpin = isMyTurn && (gameState.status === 'idle' || gameState.status === 'landed');
-    const canPickLetter = isMyTurn && gameState.status === 'landed' && typeof gameState.currentSpinValue === 'number';
-    const [solveInput, setSolveInput] = useState('');
-    const [showSolveModal, setShowSolveModal] = useState(false);
-
-    // Initial Screen: Choose Identity
-    if (!isPlayerSelected) {
-      return (
-        <div className="min-h-screen bg-[#071927] text-white p-6 max-w-md mx-auto flex flex-col justify-center items-center font-sans">
-          <div className="w-full bg-[#003865] border border-[#008EAA]/40 rounded-3xl p-6 shadow-2xl text-center">
-            <div className="p-3 bg-[#78BE21]/20 text-[#78BE21] rounded-2xl w-14 h-14 flex items-center justify-center mx-auto mb-4 border border-[#78BE21]/30">
-              <Smartphone className="w-8 h-8" />
-            </div>
-            <h2 className="text-2xl font-black text-white mb-1">Join Game</h2>
-            <p className="text-xs text-[#78BE21] font-extrabold uppercase mb-6">Select your name to register your phone</p>
-
-            <div className="space-y-3 mb-6">
-              {gameState.players.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => {
-                    setSelectedPlayerId(p.id);
-                    setIsPlayerSelected(true);
-                  }}
-                  className="w-full py-4 px-4 bg-[#005B2B] hover:bg-[#78BE21] hover:text-[#003865] font-black text-lg rounded-2xl border border-[#78BE21]/30 transition shadow-lg flex items-center justify-between"
-                >
-                  <span className="flex items-center gap-3">
-                    <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: p.color }} />
-                    {p.name}
-                  </span>
-                  <span className="text-xs opacity-75">Select →</span>
-                </button>
-              ))}
-            </div>
-
-            <p className="text-[11px] text-slate-400">Ask your host if your name is not listed yet.</p>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="min-h-screen bg-[#F8F9FA] text-[#1A202C] p-4 max-w-md mx-auto flex flex-col justify-between font-sans">
-        {/* Mobile Header / Identity Switcher */}
-        <header className="bg-[#003865] text-white rounded-2xl p-4 shadow-xl">
-          <div className="flex justify-between items-center mb-2">
-            <div className="text-xs text-[#78BE21] font-extrabold uppercase">Washington County Player Phone</div>
-            <button
-              onClick={() => setIsPlayerSelected(false)}
-              className="text-[10px] bg-[#005B2B] px-2 py-1 rounded text-slate-200 hover:text-white"
-            >
-              Switch Name
-            </button>
-          </div>
-          
-          <div className="flex items-center gap-3 bg-[#071927] p-3 rounded-xl border border-white/10 mb-3">
-            <span className="w-4 h-4 rounded-full" style={{ backgroundColor: playerObj?.color }} />
-            <span className="font-black text-lg text-white">{playerObj?.name}</span>
-          </div>
-
-          <div className="flex justify-between items-center border-t border-white/20 pt-3">
-            <div>
-              <span className="text-xs text-slate-200 block">Round Score</span>
-              <span className="text-2xl font-black text-[#78BE21]">${playerObj?.score || 0}</span>
-            </div>
-            <div className="text-right">
-              <span className="text-xs text-slate-200 block">Total Score</span>
-              <span className="text-lg font-bold text-white">${playerObj?.totalScore || 0}</span>
-            </div>
-          </div>
-        </header>
-
-        {/* Turn Indicator Banner */}
-        <div className={`my-4 p-4 rounded-2xl border text-center transition ${
-          isMyTurn 
-            ? 'bg-[#005B2B] border-[#78BE21] text-white shadow-lg'
-            : 'bg-white border-slate-300 text-slate-600 shadow-sm'
-        }`}>
-          <div className={`text-xs font-bold uppercase tracking-wider mb-1 ${isMyTurn ? 'text-[#78BE21]' : 'text-slate-500'}`}>
-            {isMyTurn ? "IT'S YOUR TURN!" : `WAITING FOR ${activePlayer.name}`}
-          </div>
-          <p className="text-sm font-medium">{gameState.lastActionText}</p>
-        </div>
-
-        {/* Action Controls Area */}
-        <main className="flex-1 flex flex-col justify-center gap-4 my-2">
-          
-          {/* SPIN BUTTON */}
-          <button
-            onClick={handleSpinWheel}
-            disabled={!canSpin}
-            className={`w-full py-5 rounded-2xl font-black text-2xl flex items-center justify-center gap-3 shadow-xl transition transform active:scale-95 ${
-              canSpin
-                ? 'bg-[#005B2B] text-white hover:bg-[#003865] shadow-green-900/20'
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
-            }`}
-          >
-            <RotateCw className={`w-7 h-7 ${gameState.status === 'spinning' ? 'animate-spin' : ''}`} />
-            SPIN WHEEL
-          </button>
-
-          {/* SOLVE PUZZLE BUTTON */}
-          <button
-            onClick={() => setShowSolveModal(true)}
-            disabled={!isMyTurn || gameState.status === 'spinning'}
-            className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border transition ${
-              isMyTurn && gameState.status !== 'spinning'
-                ? 'bg-[#003865] hover:bg-[#008EAA] text-white border-transparent'
-                : 'bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-[#78BE21]" />
-            ATTEMPT TO SOLVE PUZZLE
-          </button>
-
-          {/* LETTER KEYBOARD SELECTION */}
-          <div className="bg-white border border-slate-300 rounded-2xl p-4 shadow-md">
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 text-center">
-              {canPickLetter ? "SELECT A LETTER" : "LETTER KEYBOARD (SPIN FIRST)"}
-            </div>
-            
-            <div className="grid grid-cols-7 gap-1.5">
-              {ALPHABET.map((char) => {
-                const isUsed = gameState.guessedLetters.includes(char);
-                const disabled = !canPickLetter || isUsed;
-
-                return (
-                  <button
-                    key={char}
-                    onClick={() => handleSelectLetter(char)}
-                    disabled={disabled}
-                    className={`h-11 rounded-lg font-black text-lg transition flex items-center justify-center border ${
-                      isUsed
-                        ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed'
-                        : canPickLetter
-                        ? 'bg-[#003865] text-white border-[#008EAA] hover:bg-[#005B2B] hover:scale-105 shadow active:scale-95'
-                        : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
-                    }`}
-                  >
-                    {char}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </main>
-
-        {/* Solve Modal */}
-        {showSolveModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white border border-slate-200 p-6 rounded-3xl w-full max-w-sm shadow-2xl">
-              <h3 className="text-xl font-black text-[#003865] mb-2">Solve Training Puzzle</h3>
-              <p className="text-xs text-slate-500 mb-4">Enter the full exact solution phrase below:</p>
-              
-              <input
-                type="text"
-                value={solveInput}
-                onChange={(e) => setSolveInput(e.target.value)}
-                placeholder="TYPE PHRASE HERE..."
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-[#003865] font-bold tracking-wider uppercase mb-4 focus:outline-none focus:border-[#005B2B]"
-              />
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowSolveModal(false)}
-                  className="flex-1 py-3 bg-slate-200 text-slate-700 font-bold rounded-xl"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    handleSolveAttempt(solveInput);
-                    setShowSolveModal(false);
-                    setSolveInput('');
-                  }}
-                  className="flex-1 py-3 bg-[#005B2B] text-white font-black rounded-xl"
-                >
-                  Submit
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <footer className="text-center text-[10px] text-slate-400 my-2">
-          Washington County MN • Player Controller: {playerObj.name}
-        </footer>
-      </div>
-    );
-  };
-
-  // 3. ADMIN CONTROL PANEL VIEW
-  const AdminView = () => {
-    // Password Verification Screen
-    if (!isAdminUnlocked) {
-      return (
-        <div className="min-h-[80vh] flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center">
-            <div className="w-16 h-16 bg-[#003865]/10 text-[#003865] rounded-2xl flex items-center justify-center mx-auto mb-4 border border-[#003865]/20">
-              <ShieldCheck className="w-10 h-10 text-[#005B2B]" />
-            </div>
-            <h2 className="text-2xl font-black text-[#003865] mb-2">Admin Panel Access</h2>
-            <p className="text-sm text-slate-500 mb-6">Enter host passcode to manage training puzzles and score overrides.</p>
-            
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              if (adminPasscode === ADMIN_SECRET) {
-                setIsAdminUnlocked(true);
-                setAdminPassError(false);
-              } else {
-                setAdminPassError(true);
-              }
-            }}>
-              <input
-                type="password"
-                autoFocus
-                value={adminPasscode}
-                onChange={(e) => {
-                  setAdminPasscode(e.target.value);
-                  if (adminPassError) setAdminPassError(false);
-                }}
-                placeholder="Enter Passcode (1234)"
-                className={`w-full text-center text-2xl font-bold tracking-widest bg-slate-50 border rounded-2xl p-4 mb-4 focus:outline-none ${
-                  adminPassError ? 'border-rose-500 bg-rose-50 text-rose-900' : 'border-slate-300 focus:border-[#005B2B] text-[#003865]'
-                }`}
-              />
-
-              {adminPassError && (
-                <p className="text-xs text-rose-600 font-bold mb-4 flex items-center justify-center gap-1">
-                  <AlertTriangle className="w-4 h-4" /> Incorrect Passcode. Try again.
-                </p>
-              )}
-
-              <button
-                type="submit"
-                className="w-full py-4 bg-[#005B2B] hover:bg-[#003865] text-white font-black rounded-2xl shadow-lg transition"
-              >
-                UNLOCK ADMIN PANEL
-              </button>
-            </form>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="min-h-screen bg-[#F8F9FA] text-[#1A202C] p-4 sm:p-8 font-sans max-w-6xl mx-auto">
-        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-300 pb-6 mb-8 gap-4">
-          <div>
-            <h1 className="text-3xl font-black text-[#003865] flex items-center gap-3">
-              <ShieldCheck className="w-8 h-8 text-[#005B2B]" />
-              Washington County Admin Panel
-            </h1>
-            <p className="text-sm text-slate-600">Manage training puzzles, turns, and scores live for employee sessions.</p>
-          </div>
-
-          <div className="flex gap-3">
-            <button
-              onClick={handleNextRound}
-              className="px-4 py-2.5 bg-[#005B2B] hover:bg-[#003865] text-white font-bold rounded-xl flex items-center gap-2 shadow-md transition"
-            >
-              <RefreshCw className="w-4 h-4" /> Next Puzzle / Reset Round
-            </button>
-            <button
-              onClick={() => {
-                setIsAdminUnlocked(false);
-                setAdminPasscode('');
-              }}
-              className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl flex items-center gap-2 shadow-sm transition text-xs"
-            >
-              Lock Admin
-            </button>
-          </div>
-        </header>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
-          {/* Left Column: Live Game State Overrides */}
-          <div className="lg:col-span-7 space-y-6">
-            
-            {/* Active Puzzle Selection & Management */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md">
-              <h2 className="text-lg font-bold text-[#003865] mb-4 flex items-center gap-2">
-                <Play className="w-5 h-5 text-[#005B2B]" /> Puzzle Bank Management ({gameState.puzzles.length})
-              </h2>
-
-              <div className="space-y-3">
-                {gameState.puzzles.map((p, idx) => (
-                  <div
-                    key={idx}
-                    className={`p-4 rounded-xl border flex items-center justify-between gap-3 ${
-                      gameState.activePuzzleIndex === idx
-                        ? 'bg-[#005B2B]/10 border-[#005B2B] text-[#003865]'
-                        : 'bg-slate-50 border-slate-200 text-slate-600'
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <span className="text-xs font-extrabold uppercase text-[#005B2B] block">{p.category}</span>
-                      <span className="font-extrabold text-base text-[#003865] break-words">{p.phrase}</span>
-                      {p.hint && <span className="text-xs text-slate-500 block italic">Hint: {p.hint}</span>}
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {gameState.activePuzzleIndex !== idx ? (
-                        <button
-                          onClick={() => updateGame({ activePuzzleIndex: idx, guessedLetters: [], status: 'idle' })}
-                          className="px-3 py-1.5 bg-[#003865] hover:bg-[#008EAA] text-xs font-bold rounded-lg text-white"
-                        >
-                          Activate
-                        </button>
-                      ) : (
-                        <span className="px-2.5 py-1 bg-[#005B2B] text-white text-[10px] font-black rounded-lg">ACTIVE</span>
-                      )}
-
-                      <button
-                        onClick={() => handleDeletePuzzle(idx)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 transition"
-                        title="Delete Puzzle from Bank"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Players Management & Score Override */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-bold text-[#003865] flex items-center gap-2">
-                  <Award className="w-5 h-5 text-[#005B2B]" /> Player Roster ({gameState.players.length}/8)
-                </h2>
-              </div>
-
-              {/* Add New Player Form */}
-              <form onSubmit={handleAddPlayerSubmit} className="flex gap-2 mb-4">
-                <input
-                  type="text"
-                  value={newPlayerName}
-                  onChange={(e) => setNewPlayerName(e.target.value)}
-                  placeholder="Enter new player name..."
-                  className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-[#003865] font-bold focus:outline-none focus:border-[#005B2B]"
-                />
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-[#005B2B] hover:bg-[#003865] text-white text-xs font-bold rounded-xl shadow"
-                >
-                  + Add Player
-                </button>
-              </form>
-
-              <div className="space-y-3">
-                {gameState.players.map((player, idx) => {
-                  const isActive = idx === gameState.activePlayerIndex;
-
-                  return (
-                    <div key={player.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: player.color }} />
-                        <div>
-                          <input
-                            type="text"
-                            value={player.name}
-                            onChange={(e) => {
-                              const newName = e.target.value;
-                              updateGame((prev) => {
-                                const copy = [...prev.players];
-                                copy[idx].name = newName;
-                                return { ...prev, players: copy };
-                              });
-                            }}
-                            className="font-bold text-[#003865] bg-transparent border-b border-dashed border-slate-400 focus:outline-none focus:border-[#005B2B]"
-                          />
-                          {isActive && <span className="ml-2 text-[10px] bg-[#78BE21] text-[#003865] px-2 py-0.5 rounded font-black">ACTIVE TURN</span>}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <span className="text-[10px] text-slate-500 block">Round Score</span>
-                          <input
-                            type="number"
-                            value={player.score}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value) || 0;
-                              updateGame((prev) => {
-                                const copy = [...prev.players];
-                                copy[idx].score = val;
-                                return { ...prev, players: copy };
-                              });
-                            }}
-                            className="w-20 bg-white border border-slate-300 text-[#005B2B] font-bold text-sm px-2 py-1 rounded text-right"
-                          />
-                        </div>
-
-                        {!isActive && (
-                          <button
-                            onClick={() => updateGame({ activePlayerIndex: idx })}
-                            className="px-3 py-1.5 bg-[#003865] hover:bg-[#008EAA] text-xs font-bold rounded-lg text-white"
-                          >
-                            Set Turn
-                          </button>
-                        )}
-                        
-                        {gameState.players.length > 2 && (
-                          <button
-                            onClick={() => {
-                              updateGame((prev) => ({
-                                ...prev,
-                                players: prev.players.filter((_, pIdx) => pIdx !== idx),
-                                activePlayerIndex: 0
-                              }));
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 transition"
-                            title="Remove Player"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column: Add Custom Puzzles */}
-          <div className="lg:col-span-5 space-y-6">
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md">
-              <h2 className="text-lg font-bold text-[#003865] mb-4 flex items-center gap-2">
-                <Plus className="w-5 h-5 text-[#005B2B]" /> Add New Training Puzzle
-              </h2>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs text-slate-500 font-semibold uppercase block mb-1">Puzzle Phrase</label>
-                  <input
-                    type="text"
-                    value={newPuzzlePhrase}
-                    onChange={(e) => setNewPuzzlePhrase(e.target.value)}
-                    placeholder="e.g. QUALITY ASSURANCE"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-[#003865] font-bold tracking-wider uppercase focus:outline-none focus:border-[#005B2B]"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs text-slate-500 font-semibold uppercase block mb-1">Category</label>
-                  <input
-                    type="text"
-                    value={newPuzzleCategory}
-                    onChange={(e) => setNewPuzzleCategory(e.target.value)}
-                    placeholder="e.g. DEPT GOALS"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-[#003865] font-bold uppercase focus:outline-none focus:border-[#005B2B]"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs text-slate-500 font-semibold uppercase block mb-1">Hint (Optional)</label>
-                  <input
-                    type="text"
-                    value={newPuzzleHint}
-                    onChange={(e) => setNewPuzzleHint(e.target.value)}
-                    placeholder="e.g. Key milestone for Q3"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-slate-700 text-sm focus:outline-none focus:border-[#005B2B]"
-                  />
-                </div>
-
-                <button
-                  onClick={() => {
-                    if (!newPuzzlePhrase || !newPuzzleCategory) return;
-                    const newEntry = {
-                      phrase: newPuzzlePhrase.trim().toUpperCase(),
-                      category: newPuzzleCategory.trim().toUpperCase(),
-                      hint: newPuzzleHint.trim()
-                    };
-                    updateGame((prev) => ({
-                      ...prev,
-                      puzzles: [...prev.puzzles, newEntry]
-                    }));
-                    setNewPuzzlePhrase('');
-                    setNewPuzzleCategory('');
-                    setNewPuzzleHint('');
-                  }}
-                  className="w-full py-3 bg-[#005B2B] hover:bg-[#003865] text-white font-black rounded-xl shadow-md transition"
-                >
-                  ADD PUZZLE TO BANK
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ==========================================
-  // ROOT SWITCHER UI
-  // ==========================================
   return (
     <div className="min-h-screen bg-slate-950 font-sans">
       {/* Top Floating View Switcher Bar */}
@@ -1270,10 +547,622 @@ export default function App() {
         </button>
       </nav>
 
-      {/* Render Active View */}
-      {viewMode === 'display' && <DisplayView />}
-      {viewMode === 'player' && <PlayerView />}
-      {viewMode === 'admin' && <AdminView />}
+      {/* 1. DISPLAY VIEW */}
+      {viewMode === 'display' && (
+        <div className="min-h-screen bg-[#071927] text-white flex flex-col justify-between p-4 sm:p-6 overflow-hidden relative font-sans">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#005B2B]/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#008EAA]/20 rounded-full blur-3xl pointer-events-none" />
+
+          <header className="flex flex-col sm:flex-row justify-between items-center bg-[#003865]/90 border border-[#008EAA]/40 rounded-2xl p-4 shadow-2xl backdrop-blur gap-4 z-10">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-[#78BE21]/20 text-[#78BE21] rounded-xl border border-[#78BE21]/30">
+                <Trophy className="w-8 h-8 animate-pulse" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-black tracking-wider text-white">WASHINGTON COUNTY</h1>
+                <p className="text-xs text-[#78BE21] uppercase tracking-widest font-extrabold">Training & Learning Wheel</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 bg-[#071927] px-6 py-2.5 rounded-xl border border-[#003865]">
+              <div className="text-right">
+                <div className="text-xs text-slate-400 font-semibold uppercase">Category</div>
+                <div className="text-lg font-bold text-[#78BE21]">{currentPuzzle.category}</div>
+              </div>
+              {currentPuzzle.hint && (
+                <div className="hidden lg:block border-l border-slate-800 pl-4 text-left">
+                  <div className="text-xs text-slate-400 font-semibold uppercase">Hint</div>
+                  <div className="text-sm text-slate-200 italic">{currentPuzzle.hint}</div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => updateGame({ soundEnabled: !gameState.soundEnabled })}
+                className="p-2.5 rounded-xl bg-[#003865] hover:bg-[#008EAA] text-white border border-slate-700 transition"
+                title="Toggle Audio SFX"
+              >
+                {gameState.soundEnabled ? <Volume2 className="w-5 h-5 text-[#78BE21]" /> : <VolumeX className="w-5 h-5 text-rose-400" />}
+              </button>
+              <div className="text-xs font-mono bg-[#071927] px-3 py-2 rounded-xl text-slate-300 border border-[#003865]">
+                ROUND {gameState.activePuzzleIndex + 1} / {gameState.puzzles.length}
+              </div>
+            </div>
+          </header>
+
+          <main className="my-6 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center z-10">
+            <div className="lg:col-span-8 flex flex-col items-center justify-center">
+              <div className="w-full bg-[#003865]/90 border-4 border-[#78BE21]/60 rounded-3xl p-6 sm:p-8 shadow-[0_0_50px_rgba(120,190,33,0.15)] backdrop-blur">
+                <div className="flex flex-wrap justify-center gap-2 sm:gap-3 max-w-4xl mx-auto">
+                  {words.map((word, wordIdx) => (
+                    <div key={wordIdx} className="flex gap-1.5 sm:gap-2 my-1">
+                      {word.split('').map((char, charIdx) => {
+                        const isRevealed = gameState.guessedLetters.includes(char) || !ALPHABET.includes(char);
+                        return (
+                          <div
+                            key={charIdx}
+                            className={`w-9 h-12 sm:w-12 sm:h-16 border-2 flex items-center justify-center font-black text-xl sm:text-3xl rounded-lg shadow-inner transition-all duration-500 transform ${
+                              !ALPHABET.includes(char)
+                                ? 'bg-transparent border-transparent text-[#78BE21]'
+                                : isRevealed
+                                ? 'bg-white border-[#005B2B] text-[#003865] shadow-md scale-100 rotate-0'
+                                : 'bg-[#005B2B]/90 border-[#78BE21]/40 text-transparent scale-95'
+                            }`}
+                          >
+                            {isRevealed ? char : ''}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-6 w-full bg-[#003865]/80 border border-[#008EAA]/40 rounded-2xl p-4 text-center shadow-lg">
+                <div className="text-xs font-bold text-[#78BE21] uppercase tracking-wider mb-1">Status Log</div>
+                <div className="text-lg sm:text-xl font-bold text-white animate-pulse">
+                  {gameState.lastActionText}
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-4 flex flex-col items-center justify-center">
+              <div className="relative w-64 h-64 sm:w-80 sm:h-80 flex items-center justify-center">
+                <div className="absolute -top-3 z-30 w-0 h-0 border-l-[16px] border-l-transparent border-r-[16px] border-r-transparent border-t-[32px] border-t-[#78BE21] drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]" />
+
+                <div
+                  className="w-full h-full rounded-full shadow-[0_0_40px_rgba(0,0,0,0.9)] border-8 border-[#003865] overflow-hidden relative transition-transform ease-out"
+                  style={{
+                    transform: `rotate(${gameState.wheelRotation}deg)`,
+                    transitionDuration: gameState.status === 'spinning' ? '3.2s' : '0s'
+                  }}
+                >
+                  <svg viewBox="0 0 100 100" className="w-full h-full">
+                    {WHEEL_WEDGES.map((wedge, idx) => {
+                      const angle = 360 / WHEEL_WEDGES.length;
+                      const startAngle = idx * angle;
+                      const endAngle = (idx + 1) * angle;
+                      const x1 = 50 + 50 * Math.cos((Math.PI * startAngle) / 180);
+                      const y1 = 50 + 50 * Math.sin((Math.PI * startAngle) / 180);
+                      const x2 = 50 + 50 * Math.cos((Math.PI * endAngle) / 180);
+                      const y2 = 50 + 50 * Math.sin((Math.PI * endAngle) / 180);
+                      const pathData = `M 50 50 L ${x1} ${y1} A 50 50 0 0 1 ${x2} ${y2} Z`;
+                      const textAngle = startAngle + angle / 2;
+                      const isLongText = wedge.label.length > 5;
+                      const fontSize = isLongText ? "3.2" : "4.8";
+                      const textRadius = isLongText ? 31 : 33;
+
+                      return (
+                        <g key={idx}>
+                          <path d={pathData} fill={wedge.color} stroke="#003865" strokeWidth="0.5" />
+                          <text
+                            x="50"
+                            y={50 - textRadius}
+                            fill={wedge.text}
+                            fontSize={fontSize}
+                            fontWeight="900"
+                            letterSpacing={isLongText ? "-0.2" : "0"}
+                            dominantBaseline="central"
+                            textAnchor="middle"
+                            transform={`rotate(${textAngle + 90}, 50, 50)`}
+                          >
+                            {wedge.label}
+                          </text>
+                        </g>
+                      );
+                    })}
+                    <circle cx="50" cy="50" r="10" fill="#003865" stroke="#78BE21" strokeWidth="2" />
+                  </svg>
+                </div>
+              </div>
+
+              {gameState.currentSpinValue && (
+                <div className="mt-4 px-6 py-2 rounded-xl bg-[#78BE21] text-[#003865] font-black text-xl shadow-lg animate-bounce">
+                  LANDED ON: {gameState.currentSpinValue}
+                </div>
+              )}
+            </div>
+          </main>
+
+          <footer className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch z-10">
+            <div className="lg:col-span-8 bg-[#003865]/90 border border-[#008EAA]/40 rounded-2xl p-4 flex flex-wrap sm:flex-nowrap gap-4 justify-around items-center shadow-xl">
+              {gameState.players.map((p, idx) => {
+                const isActive = idx === gameState.activePlayerIndex;
+                return (
+                  <div
+                    key={p.id}
+                    className={`flex-1 min-w-[140px] p-3 rounded-xl border transition-all ${
+                      isActive
+                        ? 'bg-[#005B2B] border-[#78BE21] shadow-[0_0_20px_rgba(120,190,33,0.3)] scale-105'
+                        : 'bg-[#071927]/80 border-slate-800 opacity-80'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
+                      <span className="font-bold text-sm truncate">{p.name}</span>
+                      {isActive && <span className="text-[10px] bg-[#78BE21] text-[#003865] px-1.5 py-0.5 rounded font-black">TURN</span>}
+                    </div>
+                    <div className="flex justify-between items-baseline mt-2">
+                      <div>
+                        <span className="text-[10px] text-slate-300 uppercase block">Round</span>
+                        <span className="text-xl font-extrabold text-[#78BE21]">${p.score}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-300 uppercase block">Total</span>
+                        <span className="text-sm font-bold text-slate-200">${p.totalScore}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="lg:col-span-4 bg-[#003865]/90 border border-[#008EAA]/40 rounded-2xl p-4 shadow-xl flex flex-col justify-center">
+              <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 text-center">
+                Used Letters Board
+              </div>
+              <div className="flex flex-wrap justify-center gap-1">
+                {ALPHABET.map((char) => {
+                  const isUsed = gameState.guessedLetters.includes(char);
+                  return (
+                    <span
+                      key={char}
+                      className={`w-6 h-6 text-xs font-bold rounded flex items-center justify-center border ${
+                        isUsed
+                          ? 'bg-slate-900 border-slate-800 text-slate-600 line-through'
+                          : 'bg-[#005B2B] border-[#78BE21] text-white'
+                      }`}
+                    >
+                      {char}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          </footer>
+        </div>
+      )}
+
+      {/* 2. PLAYER PHONE VIEW */}
+      {viewMode === 'player' && (
+        !isPlayerSelected ? (
+          <div className="min-h-screen bg-[#071927] text-white p-6 max-w-md mx-auto flex flex-col justify-center items-center font-sans">
+            <div className="w-full bg-[#003865] border border-[#008EAA]/40 rounded-3xl p-6 shadow-2xl text-center">
+              <div className="p-3 bg-[#78BE21]/20 text-[#78BE21] rounded-2xl w-14 h-14 flex items-center justify-center mx-auto mb-4 border border-[#78BE21]/30">
+                <Smartphone className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-black text-white mb-1">Join Game</h2>
+              <p className="text-xs text-[#78BE21] font-extrabold uppercase mb-6">Select your name to register your phone</p>
+
+              <div className="space-y-3 mb-6">
+                {gameState.players.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      setSelectedPlayerId(p.id);
+                      setIsPlayerSelected(true);
+                    }}
+                    className="w-full py-4 px-4 bg-[#005B2B] hover:bg-[#78BE21] hover:text-[#003865] font-black text-lg rounded-2xl border border-[#78BE21]/30 transition shadow-lg flex items-center justify-between"
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: p.color }} />
+                      {p.name}
+                    </span>
+                    <span className="text-xs opacity-75">Select →</span>
+                  </button>
+                ))}
+              </div>
+
+              <p className="text-[11px] text-slate-400">Ask your host if your name is not listed yet.</p>
+            </div>
+          </div>
+        ) : (
+          <div className="min-h-screen bg-[#F8F9FA] text-[#1A202C] p-4 max-w-md mx-auto flex flex-col justify-between font-sans">
+            <header className="bg-[#003865] text-white rounded-2xl p-4 shadow-xl">
+              <div className="flex justify-between items-center mb-2">
+                <div className="text-xs text-[#78BE21] font-extrabold uppercase">Washington County Player Phone</div>
+                <button
+                  onClick={() => setIsPlayerSelected(false)}
+                  className="text-[10px] bg-[#005B2B] px-2 py-1 rounded text-slate-200 hover:text-white"
+                >
+                  Switch Name
+                </button>
+              </div>
+              
+              <div className="flex items-center gap-3 bg-[#071927] p-3 rounded-xl border border-white/10 mb-3">
+                <span className="w-4 h-4 rounded-full" style={{ backgroundColor: playerObj?.color }} />
+                <span className="font-black text-lg text-white">{playerObj?.name}</span>
+              </div>
+
+              <div className="flex justify-between items-center border-t border-white/20 pt-3">
+                <div>
+                  <span className="text-xs text-slate-200 block">Round Score</span>
+                  <span className="text-2xl font-black text-[#78BE21]">${playerObj?.score || 0}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-slate-200 block">Total Score</span>
+                  <span className="text-lg font-bold text-white">${playerObj?.totalScore || 0}</span>
+                </div>
+              </div>
+            </header>
+
+            <div className={`my-4 p-4 rounded-2xl border text-center transition ${
+              isMyTurn 
+                ? 'bg-[#005B2B] border-[#78BE21] text-white shadow-lg'
+                : 'bg-white border-slate-300 text-slate-600 shadow-sm'
+            }`}>
+              <div className={`text-xs font-bold uppercase tracking-wider mb-1 ${isMyTurn ? 'text-[#78BE21]' : 'text-slate-500'}`}>
+                {isMyTurn ? "IT'S YOUR TURN!" : `WAITING FOR ${activePlayer.name}`}
+              </div>
+              <p className="text-sm font-medium">{gameState.lastActionText}</p>
+            </div>
+
+            <main className="flex-1 flex flex-col justify-center gap-4 my-2">
+              <button
+                onClick={handleSpinWheel}
+                disabled={!canSpin}
+                className={`w-full py-5 rounded-2xl font-black text-2xl flex items-center justify-center gap-3 shadow-xl transition transform active:scale-95 ${
+                  canSpin
+                    ? 'bg-[#005B2B] text-white hover:bg-[#003865] shadow-green-900/20'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
+                }`}
+              >
+                <RotateCw className={`w-7 h-7 ${gameState.status === 'spinning' ? 'animate-spin' : ''}`} />
+                SPIN WHEEL
+              </button>
+
+              <div className="bg-white border border-slate-300 rounded-2xl p-4 shadow-md">
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 text-center">
+                  {canPickLetter ? "SELECT A LETTER" : "LETTER KEYBOARD (SPIN FIRST)"}
+                </div>
+                
+                <div className="grid grid-cols-7 gap-1.5">
+                  {ALPHABET.map((char) => {
+                    const isUsed = gameState.guessedLetters.includes(char);
+                    const disabled = !canPickLetter || isUsed;
+
+                    return (
+                      <button
+                        key={char}
+                        onClick={() => handleSelectLetter(char)}
+                        disabled={disabled}
+                        className={`h-11 rounded-lg font-black text-lg transition flex items-center justify-center border ${
+                          isUsed
+                            ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed'
+                            : canPickLetter
+                            ? 'bg-[#003865] text-white border-[#008EAA] hover:bg-[#005B2B] hover:scale-105 shadow active:scale-95'
+                            : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                        }`}
+                      >
+                        {char}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </main>
+
+            <footer className="text-center text-[10px] text-slate-400 my-2">
+              Washington County MN • Player Controller: {playerObj?.name}
+            </footer>
+          </div>
+        )
+      )}
+
+      {/* 3. ADMIN PANEL VIEW */}
+      {viewMode === 'admin' && (
+        !isAdminUnlocked ? (
+          <div className="min-h-[80vh] flex items-center justify-center p-4">
+            <div className="bg-white border border-slate-200 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center">
+              <div className="w-16 h-16 bg-[#003865]/10 text-[#003865] rounded-2xl flex items-center justify-center mx-auto mb-4 border border-[#003865]/20">
+                <ShieldCheck className="w-10 h-10 text-[#005B2B]" />
+              </div>
+              <h2 className="text-2xl font-black text-[#003865] mb-2">Admin Panel Access</h2>
+              <p className="text-sm text-slate-500 mb-6">Enter host passcode to manage training puzzles and score overrides.</p>
+              
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (adminPasscode === ADMIN_SECRET) {
+                  setIsAdminUnlocked(true);
+                  setAdminPassError(false);
+                } else {
+                  setAdminPassError(true);
+                }
+              }}>
+                <input
+                  type="password"
+                  autoFocus
+                  value={adminPasscode}
+                  onChange={(e) => {
+                    setAdminPasscode(e.target.value);
+                    if (adminPassError) setAdminPassError(false);
+                  }}
+                  placeholder="Enter Passcode (1234)"
+                  className={`w-full text-center text-2xl font-bold tracking-widest bg-slate-50 border rounded-2xl p-4 mb-4 focus:outline-none ${
+                    adminPassError ? 'border-rose-500 bg-rose-50 text-rose-900' : 'border-slate-300 focus:border-[#005B2B] text-[#003865]'
+                  }`}
+                />
+
+                {adminPassError && (
+                  <p className="text-xs text-rose-600 font-bold mb-4 flex items-center justify-center gap-1">
+                    <AlertTriangle className="w-4 h-4" /> Incorrect Passcode. Try again.
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full py-4 bg-[#005B2B] hover:bg-[#003865] text-white font-black rounded-2xl shadow-lg transition"
+                >
+                  UNLOCK ADMIN PANEL
+                </button>
+              </form>
+            </div>
+          </div>
+        ) : (
+          <div className="min-h-screen bg-[#F8F9FA] text-[#1A202C] p-4 sm:p-8 font-sans max-w-6xl mx-auto">
+            <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-300 pb-6 mb-8 gap-4">
+              <div>
+                <h1 className="text-3xl font-black text-[#003865] flex items-center gap-3">
+                  <ShieldCheck className="w-8 h-8 text-[#005B2B]" />
+                  Washington County Admin Panel
+                </h1>
+                <p className="text-sm text-slate-600">Manage training puzzles, turns, and scores live for employee sessions.</p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleNextRound}
+                  className="px-4 py-2.5 bg-[#005B2B] hover:bg-[#003865] text-white font-bold rounded-xl flex items-center gap-2 shadow-md transition"
+                >
+                  <RefreshCw className="w-4 h-4" /> Next Puzzle / Reset Round
+                </button>
+                <button
+                  onClick={() => {
+                    setIsAdminUnlocked(false);
+                    setAdminPasscode('');
+                  }}
+                  className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl flex items-center gap-2 shadow-sm transition text-xs"
+                >
+                  Lock Admin
+                </button>
+              </div>
+            </header>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              <div className="lg:col-span-7 space-y-6">
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md">
+                  <h2 className="text-lg font-bold text-[#003865] mb-4 flex items-center gap-2">
+                    <Play className="w-5 h-5 text-[#005B2B]" /> Puzzle Bank Management ({gameState.puzzles.length})
+                  </h2>
+
+                  <div className="space-y-3">
+                    {gameState.puzzles.map((p, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-4 rounded-xl border flex items-center justify-between gap-3 ${
+                          gameState.activePuzzleIndex === idx
+                            ? 'bg-[#005B2B]/10 border-[#005B2B] text-[#003865]'
+                            : 'bg-slate-50 border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <span className="text-xs font-extrabold uppercase text-[#005B2B] block">{p.category}</span>
+                          <span className="font-extrabold text-base text-[#003865] break-words">{p.phrase}</span>
+                          {p.hint && <span className="text-xs text-slate-500 block italic">Hint: {p.hint}</span>}
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {gameState.activePuzzleIndex !== idx ? (
+                            <button
+                              onClick={() => updateGame({ activePuzzleIndex: idx, guessedLetters: [], status: 'idle' })}
+                              className="px-3 py-1.5 bg-[#003865] hover:bg-[#008EAA] text-xs font-bold rounded-lg text-white"
+                            >
+                              Activate
+                            </button>
+                          ) : (
+                            <span className="px-2.5 py-1 bg-[#005B2B] text-white text-[10px] font-black rounded-lg">ACTIVE</span>
+                          )}
+
+                          <button
+                            onClick={() => handleDeletePuzzle(idx)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 transition"
+                            title="Delete Puzzle from Bank"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md">
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-bold text-[#003865] flex items-center gap-2">
+                      <Award className="w-5 h-5 text-[#005B2B]" /> Player Roster ({gameState.players.length}/8)
+                    </h2>
+                  </div>
+
+                  <form onSubmit={handleAddPlayerSubmit} className="flex gap-2 mb-4">
+                    <input
+                      type="text"
+                      value={newPlayerName}
+                      onChange={(e) => setNewPlayerName(e.target.value)}
+                      placeholder="Enter new player name..."
+                      className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-[#003865] font-bold focus:outline-none focus:border-[#005B2B]"
+                    />
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-[#005B2B] hover:bg-[#003865] text-white text-xs font-bold rounded-xl shadow"
+                    >
+                      + Add Player
+                    </button>
+                  </form>
+
+                  <div className="space-y-3">
+                    {gameState.players.map((player, idx) => {
+                      const isActive = idx === gameState.activePlayerIndex;
+
+                      return (
+                        <div key={player.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: player.color }} />
+                            <div>
+                              <input
+                                type="text"
+                                value={player.name}
+                                onChange={(e) => {
+                                  const newName = e.target.value;
+                                  updateGame((prev) => {
+                                    const copy = [...prev.players];
+                                    copy[idx].name = newName;
+                                    return { ...prev, players: copy };
+                                  });
+                                }}
+                                className="font-bold text-[#003865] bg-transparent border-b border-dashed border-slate-400 focus:outline-none focus:border-[#005B2B]"
+                              />
+                              {isActive && <span className="ml-2 text-[10px] bg-[#78BE21] text-[#003865] px-2 py-0.5 rounded font-black">ACTIVE TURN</span>}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <span className="text-[10px] text-slate-500 block">Round Score</span>
+                              <input
+                                type="number"
+                                value={player.score}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value) || 0;
+                                  updateGame((prev) => {
+                                    const copy = [...prev.players];
+                                    copy[idx].score = val;
+                                    return { ...prev, players: copy };
+                                  });
+                                }}
+                                className="w-20 bg-white border border-slate-300 text-[#005B2B] font-bold text-sm px-2 py-1 rounded text-right"
+                              />
+                            </div>
+
+                            {!isActive && (
+                              <button
+                                onClick={() => updateGame({ activePlayerIndex: idx })}
+                                className="px-3 py-1.5 bg-[#003865] hover:bg-[#008EAA] text-xs font-bold rounded-lg text-white"
+                              >
+                                Set Turn
+                              </button>
+                            )}
+                            
+                            {gameState.players.length > 2 && (
+                              <button
+                                onClick={() => {
+                                  updateGame((prev) => ({
+                                    ...prev,
+                                    players: prev.players.filter((_, pIdx) => pIdx !== idx),
+                                    activePlayerIndex: 0
+                                  }));
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 transition"
+                                title="Remove Player"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="lg:col-span-5 space-y-6">
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md">
+                  <h2 className="text-lg font-bold text-[#003865] mb-4 flex items-center gap-2">
+                    <Plus className="w-5 h-5 text-[#005B2B]" /> Add New Training Puzzle
+                  </h2>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs text-slate-500 font-semibold uppercase block mb-1">Puzzle Phrase</label>
+                      <input
+                        type="text"
+                        value={newPuzzlePhrase}
+                        onChange={(e) => setNewPuzzlePhrase(e.target.value)}
+                        placeholder="e.g. QUALITY ASSURANCE"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-[#003865] font-bold tracking-wider uppercase focus:outline-none focus:border-[#005B2B]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 font-semibold uppercase block mb-1">Category</label>
+                      <input
+                        type="text"
+                        value={newPuzzleCategory}
+                        onChange={(e) => setNewPuzzleCategory(e.target.value)}
+                        placeholder="e.g. DEPT GOALS"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-[#003865] font-bold uppercase focus:outline-none focus:border-[#005B2B]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 font-semibold uppercase block mb-1">Hint (Optional)</label>
+                      <input
+                        type="text"
+                        value={newPuzzleHint}
+                        onChange={(e) => setNewPuzzleHint(e.target.value)}
+                        placeholder="e.g. Key milestone for Q3"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-slate-700 text-sm focus:outline-none focus:border-[#005B2B]"
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (!newPuzzlePhrase || !newPuzzleCategory) return;
+                        const newEntry = {
+                          phrase: newPuzzlePhrase.trim().toUpperCase(),
+                          category: newPuzzleCategory.trim().toUpperCase(),
+                          hint: newPuzzleHint.trim()
+                        };
+                        updateGame((prev) => ({
+                          ...prev,
+                          puzzles: [...prev.puzzles, newEntry]
+                        }));
+                        setNewPuzzlePhrase('');
+                        setNewPuzzleCategory('');
+                        setNewPuzzleHint('');
+                      }}
+                      className="w-full py-3 bg-[#005B2B] hover:bg-[#003865] text-white font-black rounded-xl shadow-md transition"
+                    >
+                      ADD PUZZLE TO BANK
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      )}
     </div>
   );
 }
