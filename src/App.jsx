@@ -200,6 +200,7 @@ const sfx = new SoundFX();
 export default function App() {
   const [viewMode, setViewMode] = useState('display'); // 'display', 'player', 'admin'
   const [selectedPlayerId, setSelectedPlayerId] = useState('player1');
+  const [isPlayerSelected, setIsPlayerSelected] = useState(false);
   const [gameState, setGameState] = useState(INITIAL_GAME_STATE);
   const [localSolvingInput, setLocalSolvingInput] = useState('');
   const [newPuzzlePhrase, setNewPuzzlePhrase] = useState('');
@@ -295,7 +296,7 @@ export default function App() {
     // Add multiple rotations (5-8 full spins) + wedge offset angle
     const wedgeAngle = 360 / WHEEL_WEDGES.length;
     const targetDegrees = 360 * 6 + (WHEEL_WEDGES.length - randomIndex) * wedgeAngle;
-    const newTotalRotation = gameState.wheelRotation + targetDegrees;
+    const newTotalRotation = (gameState.wheelRotation || 0) + targetDegrees;
 
     updateGame((prev) => ({
       ...prev,
@@ -699,25 +700,59 @@ export default function App() {
     const [solveInput, setSolveInput] = useState('');
     const [showSolveModal, setShowSolveModal] = useState(false);
 
+    // Initial Screen: Choose Identity
+    if (!isPlayerSelected) {
+      return (
+        <div className="min-h-screen bg-[#071927] text-white p-6 max-w-md mx-auto flex flex-col justify-center items-center font-sans">
+          <div className="w-full bg-[#003865] border border-[#008EAA]/40 rounded-3xl p-6 shadow-2xl text-center">
+            <div className="p-3 bg-[#78BE21]/20 text-[#78BE21] rounded-2xl w-14 h-14 flex items-center justify-center mx-auto mb-4 border border-[#78BE21]/30">
+              <Smartphone className="w-8 h-8" />
+            </div>
+            <h2 className="text-2xl font-black text-white mb-1">Join Game</h2>
+            <p className="text-xs text-[#78BE21] font-extrabold uppercase mb-6">Select your name to register your phone</p>
+
+            <div className="space-y-3 mb-6">
+              {gameState.players.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    setSelectedPlayerId(p.id);
+                    setIsPlayerSelected(true);
+                  }}
+                  className="w-full py-4 px-4 bg-[#005B2B] hover:bg-[#78BE21] hover:text-[#003865] font-black text-lg rounded-2xl border border-[#78BE21]/30 transition shadow-lg flex items-center justify-between"
+                >
+                  <span className="flex items-center gap-3">
+                    <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: p.color }} />
+                    {p.name}
+                  </span>
+                  <span className="text-xs opacity-75">Select →</span>
+                </button>
+              ))}
+            </div>
+
+            <p className="text-[11px] text-slate-400">Ask your host if your name is not listed yet.</p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-[#F8F9FA] text-[#1A202C] p-4 max-w-md mx-auto flex flex-col justify-between font-sans">
         {/* Mobile Header / Identity Switcher */}
         <header className="bg-[#003865] text-white rounded-2xl p-4 shadow-xl">
-          <div className="text-xs text-[#78BE21] font-extrabold uppercase mb-2">Washington County Player Phone</div>
-          <div className="grid grid-cols-3 gap-2 mb-3">
-            {gameState.players.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setSelectedPlayerId(p.id)}
-                className={`py-2 px-1 text-xs font-bold rounded-xl border transition ${
-                  selectedPlayerId === p.id
-                    ? 'bg-[#78BE21] text-[#003865] border-white shadow-md'
-                    : 'bg-[#005B2B] text-white border-transparent'
-                }`}
-              >
-                {p.name}
-              </button>
-            ))}
+          <div className="flex justify-between items-center mb-2">
+            <div className="text-xs text-[#78BE21] font-extrabold uppercase">Washington County Player Phone</div>
+            <button
+              onClick={() => setIsPlayerSelected(false)}
+              className="text-[10px] bg-[#005B2B] px-2 py-1 rounded text-slate-200 hover:text-white"
+            >
+              Switch Name
+            </button>
+          </div>
+          
+          <div className="flex items-center gap-3 bg-[#071927] p-3 rounded-xl border border-white/10 mb-3">
+            <span className="w-4 h-4 rounded-full" style={{ backgroundColor: playerObj?.color }} />
+            <span className="font-black text-lg text-white">{playerObj?.name}</span>
           </div>
 
           <div className="flex justify-between items-center border-t border-white/20 pt-3">
@@ -869,20 +904,20 @@ export default function App() {
               if (adminPasscode === ADMIN_SECRET) {
                 setIsAdminUnlocked(true);
                 setAdminPassError(false);
-                setAdminPasscode('');
               } else {
                 setAdminPassError(true);
               }
             }}>
               <input
                 type="password"
+                autoFocus
                 value={adminPasscode}
                 onChange={(e) => {
                   setAdminPasscode(e.target.value);
-                  setAdminPassError(false);
+                  if (adminPassError) setAdminPassError(false);
                 }}
-                placeholder="Enter Passcode (e.g. 1234)"
-                className={`w-full text-center text-xl font-bold tracking-widest bg-slate-50 border rounded-2xl p-4 mb-4 focus:outline-none ${
+                placeholder="Enter Passcode (1234)"
+                className={`w-full text-center text-2xl font-bold tracking-widest bg-slate-50 border rounded-2xl p-4 mb-4 focus:outline-none ${
                   adminPassError ? 'border-rose-500 bg-rose-50 text-rose-900' : 'border-slate-300 focus:border-[#005B2B] text-[#003865]'
                 }`}
               />
@@ -924,7 +959,10 @@ export default function App() {
               <RefreshCw className="w-4 h-4" /> Next Puzzle / Reset Round
             </button>
             <button
-              onClick={() => setIsAdminUnlocked(false)}
+              onClick={() => {
+                setIsAdminUnlocked(false);
+                setAdminPasscode('');
+              }}
               className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl flex items-center gap-2 shadow-sm transition text-xs"
             >
               Lock Admin
@@ -974,18 +1012,49 @@ export default function App() {
 
             {/* Players Management & Score Override */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md">
-              <h2 className="text-lg font-bold text-[#003865] mb-4 flex items-center gap-2">
-                <Award className="w-5 h-5 text-[#005B2B]" /> Player Scores & Turn Override
-              </h2>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-bold text-[#003865] flex items-center gap-2">
+                  <Award className="w-5 h-5 text-[#005B2B]" /> Player Roster ({gameState.players.length}/8)
+                </h2>
+              </div>
 
-              <div className="space-y-4">
+              {/* Add New Player Form */}
+              <div className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  value={newPlayerName}
+                  onChange={(e) => setNewPlayerName(e.target.value)}
+                  placeholder="Enter new player name..."
+                  className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-[#003865] font-bold focus:outline-none focus:border-[#005B2B]"
+                />
+                <button
+                  onClick={() => {
+                    if (!newPlayerName.trim()) return;
+                    if (gameState.players.length >= 8) return;
+                    const colors = ['#005B2B', '#003865', '#008EAA', '#78BE21', '#ea580c', '#8b5cf6', '#ec4899', '#f59e0b'];
+                    const newId = `player${Date.now()}`;
+                    const color = colors[gameState.players.length % colors.length];
+                    const newP = { id: newId, name: newPlayerName.trim(), score: 0, totalScore: 0, color };
+                    updateGame((prev) => ({
+                      ...prev,
+                      players: [...prev.players, newP]
+                    }));
+                    setNewPlayerName('');
+                  }}
+                  className="px-4 py-2 bg-[#005B2B] hover:bg-[#003865] text-white text-xs font-bold rounded-xl shadow"
+                >
+                  + Add Player
+                </button>
+              </div>
+
+              <div className="space-y-3">
                 {gameState.players.map((player, idx) => {
                   const isActive = idx === gameState.activePlayerIndex;
 
                   return (
                     <div key={player.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
-                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: player.color }} />
+                        <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: player.color }} />
                         <div>
                           <span className="font-bold text-[#003865]">{player.name}</span>
                           {isActive && <span className="ml-2 text-[10px] bg-[#78BE21] text-[#003865] px-2 py-0.5 rounded font-black">ACTIVE TURN</span>}
@@ -1016,6 +1085,22 @@ export default function App() {
                             className="px-3 py-1.5 bg-[#003865] hover:bg-[#008EAA] text-xs font-bold rounded-lg text-white"
                           >
                             Set Turn
+                          </button>
+                        )}
+                        
+                        {gameState.players.length > 2 && (
+                          <button
+                            onClick={() => {
+                              updateGame((prev) => ({
+                                ...prev,
+                                players: prev.players.filter((_, pIdx) => pIdx !== idx),
+                                activePlayerIndex: 0
+                              }));
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 transition"
+                            title="Remove Player"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         )}
                       </div>
