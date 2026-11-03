@@ -21,7 +21,7 @@ const firebaseConfig = {
   appId: "1:38684144478:web:9b1d8f68a05e57d9ce15cf"
 };
 
-const appId = 'wof-training-game';
+const appId = 'wc-training-wheel';
 let firebaseApp = null;
 let db = null;
 
@@ -275,8 +275,8 @@ export default function App() {
   }, [gameState, viewMode]);
 
   // Current Active Puzzle Object (Safely dynamic & reactive)
-  const safeActiveIndex = Math.min(gameState.activePuzzleIndex || 0, (gameState.puzzles?.length || 1) - 1);
-  const currentPuzzle = gameState.puzzles?.[safeActiveIndex] || {
+  const safeActiveIndex = Math.min(gameState.activePuzzleIndex || 0, Math.max((gameState.puzzles?.length || 1) - 1, 0));
+  const currentPuzzle = (gameState.puzzles && gameState.puzzles[safeActiveIndex]) ? gameState.puzzles[safeActiveIndex] : {
     phrase: 'SAFETY FIRST ALWAYS',
     category: 'WASHINGTON COUNTY CULTURE',
     hint: 'Priority in the workplace'
