@@ -940,6 +940,44 @@ export default function App() {
       );
     }
 
+    const handleAddPlayerSubmit = (e) => {
+      e.preventDefault();
+      if (!newPlayerName.trim()) return;
+      if (gameState.players.length >= 8) return;
+      const colors = ['#005B2B', '#003865', '#008EAA', '#78BE21', '#ea580c', '#8b5cf6', '#ec4899', '#f59e0b'];
+      const newId = `player${Date.now()}`;
+      const color = colors[gameState.players.length % colors.length];
+      const newP = { id: newId, name: newPlayerName.trim(), score: 0, totalScore: 0, color };
+      updateGame((prev) => ({
+        ...prev,
+        players: [...prev.players, newP]
+      }));
+      setNewPlayerName('');
+    };
+
+    const handleDeletePuzzle = (puzzleIdx) => {
+      if (gameState.puzzles.length <= 1) {
+        alert("You must keep at least one puzzle in the bank!");
+        return;
+      }
+      updateGame((prev) => {
+        const updatedPuzzles = prev.puzzles.filter((_, idx) => idx !== puzzleIdx);
+        let nextActiveIdx = prev.activePuzzleIndex;
+        if (puzzleIdx === prev.activePuzzleIndex) {
+          nextActiveIdx = 0;
+        } else if (puzzleIdx < prev.activePuzzleIndex) {
+          nextActiveIdx = prev.activePuzzleIndex - 1;
+        }
+        return {
+          ...prev,
+          puzzles: updatedPuzzles,
+          activePuzzleIndex: nextActiveIdx,
+          guessedLetters: puzzleIdx === prev.activePuzzleIndex ? [] : prev.guessedLetters,
+          status: puzzleIdx === prev.activePuzzleIndex ? 'idle' : prev.status
+        };
+      });
+    };
+
     return (
       <div className="min-h-screen bg-[#F8F9FA] text-[#1A202C] p-4 sm:p-8 font-sans max-w-6xl mx-auto">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-300 pb-6 mb-8 gap-4">
@@ -975,36 +1013,48 @@ export default function App() {
           {/* Left Column: Live Game State Overrides */}
           <div className="lg:col-span-7 space-y-6">
             
-            {/* Active Puzzle Selection */}
+            {/* Active Puzzle Selection & Management */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md">
               <h2 className="text-lg font-bold text-[#003865] mb-4 flex items-center gap-2">
-                <Play className="w-5 h-5 text-[#005B2B]" /> Active Round Puzzle
+                <Play className="w-5 h-5 text-[#005B2B]" /> Puzzle Bank Management ({gameState.puzzles.length})
               </h2>
 
               <div className="space-y-3">
                 {gameState.puzzles.map((p, idx) => (
                   <div
                     key={idx}
-                    className={`p-4 rounded-xl border flex items-center justify-between ${
+                    className={`p-4 rounded-xl border flex items-center justify-between gap-3 ${
                       gameState.activePuzzleIndex === idx
                         ? 'bg-[#005B2B]/10 border-[#005B2B] text-[#003865]'
                         : 'bg-slate-50 border-slate-200 text-slate-600'
                     }`}
                   >
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <span className="text-xs font-extrabold uppercase text-[#005B2B] block">{p.category}</span>
-                      <span className="font-extrabold text-base text-[#003865]">{p.phrase}</span>
+                      <span className="font-extrabold text-base text-[#003865] break-words">{p.phrase}</span>
                       {p.hint && <span className="text-xs text-slate-500 block italic">Hint: {p.hint}</span>}
                     </div>
 
-                    {gameState.activePuzzleIndex !== idx && (
+                    <div className="flex items-center gap-2 shrink-0">
+                      {gameState.activePuzzleIndex !== idx ? (
+                        <button
+                          onClick={() => updateGame({ activePuzzleIndex: idx, guessedLetters: [], status: 'idle' })}
+                          className="px-3 py-1.5 bg-[#003865] hover:bg-[#008EAA] text-xs font-bold rounded-lg text-white"
+                        >
+                          Activate
+                        </button>
+                      ) : (
+                        <span className="px-2.5 py-1 bg-[#005B2B] text-white text-[10px] font-black rounded-lg">ACTIVE</span>
+                      )}
+
                       <button
-                        onClick={() => updateGame({ activePuzzleIndex: idx, guessedLetters: [], status: 'idle' })}
-                        className="px-3 py-1.5 bg-[#003865] hover:bg-[#008EAA] text-xs font-bold rounded-lg text-white"
+                        onClick={() => handleDeletePuzzle(idx)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 transition"
+                        title="Delete Puzzle from Bank"
                       >
-                        Activate
+                        <Trash2 className="w-4 h-4" />
                       </button>
-                    )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1018,8 +1068,8 @@ export default function App() {
                 </h2>
               </div>
 
-              {/* Add New Player Form */}
-              <div className="flex gap-2 mb-4">
+              {/* Add New Player Form - Wrapped in form to maintain focus */}
+              <form onSubmit={handleAddPlayerSubmit} className="flex gap-2 mb-4">
                 <input
                   type="text"
                   value={newPlayerName}
@@ -1028,24 +1078,12 @@ export default function App() {
                   className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-[#003865] font-bold focus:outline-none focus:border-[#005B2B]"
                 />
                 <button
-                  onClick={() => {
-                    if (!newPlayerName.trim()) return;
-                    if (gameState.players.length >= 8) return;
-                    const colors = ['#005B2B', '#003865', '#008EAA', '#78BE21', '#ea580c', '#8b5cf6', '#ec4899', '#f59e0b'];
-                    const newId = `player${Date.now()}`;
-                    const color = colors[gameState.players.length % colors.length];
-                    const newP = { id: newId, name: newPlayerName.trim(), score: 0, totalScore: 0, color };
-                    updateGame((prev) => ({
-                      ...prev,
-                      players: [...prev.players, newP]
-                    }));
-                    setNewPlayerName('');
-                  }}
+                  type="submit"
                   className="px-4 py-2 bg-[#005B2B] hover:bg-[#003865] text-white text-xs font-bold rounded-xl shadow"
                 >
                   + Add Player
                 </button>
-              </div>
+              </form>
 
               <div className="space-y-3">
                 {gameState.players.map((player, idx) => {
