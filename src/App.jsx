@@ -11,7 +11,6 @@ import {
 // ==========================================
 // FIREBASE & APP CONFIGURATION
 // ==========================================
-// Replace this object with your actual keys from the Firebase Console if you want real-time phone sync
 const firebaseConfig = {
   apiKey: "AIzaSyAmN_TnyIkGLPicHuMx4ZIaSMRyMrnSwUc",
   authDomain: "wc-training-wheel.firebaseapp.com",
@@ -203,7 +202,7 @@ export default function App() {
   const [isPlayerSelected, setIsPlayerSelected] = useState(false);
   const [gameState, setGameState] = useState(INITIAL_GAME_STATE);
   
-  // Admin Local Form State (Kept isolated to preserve typing focus)
+  // Admin Local Form State
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [adminPasscode, setAdminPasscode] = useState('');
   const [adminPassError, setAdminPassError] = useState(false);
@@ -212,6 +211,9 @@ export default function App() {
   const [newPuzzleCategory, setNewPuzzleCategory] = useState('');
   const [newPuzzleHint, setNewPuzzleHint] = useState('');
   const ADMIN_SECRET = '1234';
+
+  const [localSolveInput, setLocalSolveInput] = useState('');
+  const [showPlayerSolveModal, setShowPlayerSolveModal] = useState(false);
 
   const prevGameStateRef = useRef(gameState);
 
@@ -227,7 +229,6 @@ export default function App() {
           setGameState(data);
         }
       } else {
-        // Only set default if document doesn't exist at all yet
         setDoc(gameDocRef, INITIAL_GAME_STATE).catch(() => {});
       }
     }, (err) => {
@@ -237,12 +238,11 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Sync state update function (works locally + Firebase)
+  // Sync state update function
   const updateGame = async (updater) => {
     setGameState((prev) => {
       const nextState = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
       
-      // Push to Firestore if configured
       if (db) {
         const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'current');
         setDoc(gameDocRef, nextState, { merge: true }).catch((err) => {
@@ -254,9 +254,9 @@ export default function App() {
     });
   };
 
-  // Sound triggering on game state changes (ONLY plays when on the Big Screen TV view)
+  // Sound triggering on game state changes (Audio SFX plays across views)
   useEffect(() => {
-    if (!gameState.soundEnabled || viewMode !== 'display') return;
+    if (!gameState.soundEnabled) return;
     const prev = prevGameStateRef.current;
 
     if (prev.status === 'spinning' && gameState.status === 'landed') {
@@ -272,9 +272,9 @@ export default function App() {
     }
 
     prevGameStateRef.current = gameState;
-  }, [gameState, viewMode]);
+  }, [gameState]);
 
-  // Current Active Puzzle Object (Safely dynamic & reactive)
+  // Safe active puzzle lookup
   const safeActiveIndex = Math.min(gameState.activePuzzleIndex || 0, Math.max((gameState.puzzles?.length || 1) - 1, 0));
   const currentPuzzle = (gameState.puzzles && gameState.puzzles[safeActiveIndex]) ? gameState.puzzles[safeActiveIndex] : {
     phrase: 'SAFETY FIRST ALWAYS',
@@ -282,22 +282,18 @@ export default function App() {
     hint: 'Priority in the workplace'
   };
 
-  // Active Player
   const activePlayer = gameState.players[gameState.activePlayerIndex] || gameState.players[0] || { name: 'Player', color: '#3B82F6' };
 
   // ==========================================
   // GAME ACTIONS
   // ==========================================
 
-  // Spin Wheel Action
   const handleSpinWheel = () => {
     if (gameState.status !== 'idle' && gameState.status !== 'landed') return;
 
-    // Calculate spin
     const randomIndex = Math.floor(Math.random() * WHEEL_WEDGES.length);
     const chosenWedge = WHEEL_WEDGES[randomIndex];
     
-    // Add multiple rotations (5-8 full spins) + wedge offset angle
     const wedgeAngle = 360 / WHEEL_WEDGES.length;
     const targetDegrees = 360 * 6 + (WHEEL_WEDGES.length - randomIndex) * wedgeAngle;
     const newTotalRotation = (gameState.wheelRotation || 0) + targetDegrees;
@@ -309,7 +305,6 @@ export default function App() {
       lastActionText: `${activePlayer.name} is spinning the wheel...`
     }));
 
-    // Wheel ticking SFX simulation during spin
     if (gameState.soundEnabled) {
       let ticks = 0;
       const interval = setInterval(() => {
@@ -319,15 +314,19 @@ export default function App() {
       }, 130);
     }
 
-    // Land after animation time (3.2 seconds)
     setTimeout(() => {
       updateGame((prev) => {
-        let actionMsg = `${activePlayer.name} landed on $${chosenWedge.label}! Select a letter.`;
+        const wedgeAngle = 360 / WHEEL_WEDGES.length;
+        const normalizedDeg = (360 - (newTotalRotation % 360)) % 360;
+        const landedIndex = Math.floor(normalizedDeg / wedgeAngle) % WHEEL_WEDGES.length;
+        const landedWedge = WHEEL_WEDGES[landedIndex] || chosenWedge;
+
+        let actionMsg = `${activePlayer.name} landed on $${landedWedge.label}! Select a letter.`;
         let nextStatus = 'landed';
         let updatedPlayers = [...prev.players];
         let nextPlayerIndex = prev.activePlayerIndex;
 
-        if (chosenWedge.value === 'BANKRUPT') {
+        if (landedWedge.value === 'BANKRUPT') {
           actionMsg = `OH NO! ${activePlayer.name} hit BANKRUPT! Lost turn and round earnings.`;
           updatedPlayers[prev.activePlayerIndex] = {
             ...updatedPlayers[prev.activePlayerIndex],
@@ -335,18 +334,18 @@ export default function App() {
           };
           nextPlayerIndex = (prev.activePlayerIndex + 1) % prev.players.length;
           nextStatus = 'idle';
-        } else if (chosenWedge.value === 'LOSE_A_TURN') {
+        } else if (landedWedge.value === 'LOSE_A_TURN') {
           actionMsg = `LOSE A TURN! ${activePlayer.name}'s turn is skipped.`;
           nextPlayerIndex = (prev.activePlayerIndex + 1) % prev.players.length;
           nextStatus = 'idle';
-        } else if (chosenWedge.value === 'FREE_SPIN') {
+        } else if (landedWedge.value === 'FREE_SPIN') {
           actionMsg = `FREE SPIN! ${activePlayer.name} gets an extra spin or letter call!`;
         }
 
         return {
           ...prev,
           status: nextStatus,
-          currentSpinValue: chosenWedge.value,
+          currentSpinValue: landedWedge.value,
           players: updatedPlayers,
           activePlayerIndex: nextPlayerIndex,
           lastActionText: actionMsg
@@ -355,7 +354,6 @@ export default function App() {
     }, 3200);
   };
 
-  // Select Letter Action
   const handleSelectLetter = (letter) => {
     if (gameState.guessedLetters.includes(letter)) return;
 
@@ -371,7 +369,6 @@ export default function App() {
 
     const nextGuessed = [...gameState.guessedLetters, letter];
 
-    // Check if puzzle completely revealed
     const uniquePhraseLetters = Array.from(new Set(phraseUpper.replace(/[^A-Z]/g, '')));
     const isPuzzleSolved = uniquePhraseLetters.every((l) => nextGuessed.includes(l));
 
@@ -380,20 +377,17 @@ export default function App() {
       let nextPlayerIdx = prev.activePlayerIndex;
 
       if (count > 0) {
-        // Correct letter
         updatedPlayers[prev.activePlayerIndex] = {
           ...updatedPlayers[prev.activePlayerIndex],
           score: updatedPlayers[prev.activePlayerIndex].score + pointsEarned
         };
         if (gameState.soundEnabled) sfx.playDing();
       } else {
-        // Incorrect letter -> next player turn
         if (gameState.soundEnabled) sfx.playBuzzer();
         nextPlayerIdx = (prev.activePlayerIndex + 1) % prev.players.length;
       }
 
       if (isPuzzleSolved) {
-        // Award round total score to player overall
         updatedPlayers[prev.activePlayerIndex] = {
           ...updatedPlayers[prev.activePlayerIndex],
           totalScore: updatedPlayers[prev.activePlayerIndex].totalScore + updatedPlayers[prev.activePlayerIndex].score
@@ -414,13 +408,11 @@ export default function App() {
     });
   };
 
-  // Solve Puzzle Attempt
   const handleSolveAttempt = (attemptString) => {
     const cleanAttempt = attemptString.trim().toUpperCase();
     const cleanActual = currentPuzzle.phrase.trim().toUpperCase();
 
     if (cleanAttempt === cleanActual) {
-      // Reveal all letters
       const allLetters = ALPHABET.filter((char) => cleanActual.includes(char));
       
       updateGame((prev) => {
@@ -441,7 +433,6 @@ export default function App() {
         };
       });
     } else {
-      // Incorrect solve
       if (gameState.soundEnabled) sfx.playBuzzer();
       updateGame((prev) => ({
         ...prev,
@@ -452,7 +443,6 @@ export default function App() {
     }
   };
 
-  // Next Round / Reset Board
   const handleNextRound = () => {
     const nextPuzzleIdx = (gameState.activePuzzleIndex + 1) % gameState.puzzles.length;
     updateGame((prev) => ({
@@ -461,7 +451,7 @@ export default function App() {
       activePuzzleIndex: nextPuzzleIdx,
       guessedLetters: [],
       currentSpinValue: null,
-      players: prev.players.map(p => ({ ...p, score: 0 })), // Reset round score, keep totalScore
+      players: prev.players.map(p => ({ ...p, score: 0 })),
       lastActionText: `Round ${nextPuzzleIdx + 1} Started! Category: ${gameState.puzzles[nextPuzzleIdx]?.category || 'Training'}`
     }));
   };
@@ -504,9 +494,6 @@ export default function App() {
     });
   };
 
-  // ==========================================
-  // ROOT RENDERER (INLINE VIEWS TO PRESERVE DOM FOCUS)
-  // ==========================================
   const phrase = (currentPuzzle.phrase || '').trim().toUpperCase();
   const words = phrase ? phrase.split(/\s+/) : [];
   const isMyTurn = gameState.players[gameState.activePlayerIndex]?.id === selectedPlayerId;
@@ -596,17 +583,13 @@ export default function App() {
             </div>
           </header>
 
-          {/* Center Main Stage: Puzzle Board + Wheel */}
           <main className="my-6 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center z-10">
-            {/* Left / Center Column: Puzzle Letter Board */}
             <div className="lg:col-span-8 flex flex-col items-center justify-center">
-              
-              {/* Puzzle Display Matrix */}
               <div className="w-full bg-[#003865]/90 border-4 border-[#78BE21]/60 rounded-3xl p-6 sm:p-8 shadow-[0_0_50px_rgba(120,190,33,0.15)] backdrop-blur">
-                <div className="flex flex-wrap justify-center items-center gap-2 max-w-4xl mx-auto">
+                <div className="flex flex-wrap justify-center gap-2 sm:gap-3 max-w-4xl mx-auto">
                   {words.map((word, wordIdx) => (
                     <React.Fragment key={wordIdx}>
-                      <div className="flex gap-1.5 my-1 shrink-0">
+                      <div className="flex gap-1.5 sm:gap-2 my-1">
                         {word.split('').map((char, charIdx) => {
                           const isRevealed = gameState.guessedLetters.includes(char) || !ALPHABET.includes(char);
                           return (
@@ -630,6 +613,13 @@ export default function App() {
                       )}
                     </React.Fragment>
                   ))}
+                </div>
+              </div>
+
+              <div className="mt-6 w-full bg-[#003865]/80 border border-[#008EAA]/40 rounded-2xl p-4 text-center shadow-lg">
+                <div className="text-xs font-bold text-[#78BE21] uppercase tracking-wider mb-1">Status Log</div>
+                <div className="text-lg sm:text-xl font-bold text-white animate-pulse">
+                  {gameState.lastActionText}
                 </div>
               </div>
             </div>
@@ -825,7 +815,7 @@ export default function App() {
               <p className="text-sm font-medium">{gameState.lastActionText}</p>
             </div>
 
-            <main className="flex-1 flex flex-col justify-center gap-4 my-2">
+            <main className="flex-1 flex flex-col justify-center gap-3 my-2">
               <button
                 onClick={handleSpinWheel}
                 disabled={!canSpin}
@@ -837,6 +827,19 @@ export default function App() {
               >
                 <RotateCw className={`w-7 h-7 ${gameState.status === 'spinning' ? 'animate-spin' : ''}`} />
                 SPIN WHEEL
+              </button>
+
+              <button
+                onClick={() => setShowPlayerSolveModal(true)}
+                disabled={!isMyTurn || gameState.status === 'spinning'}
+                className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border transition ${
+                  isMyTurn && gameState.status !== 'spinning'
+                    ? 'bg-[#003865] hover:bg-[#008EAA] text-white border-transparent'
+                    : 'bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed'
+                }`}
+              >
+                <Sparkles className="w-4 h-4 text-[#78BE21]" />
+                ATTEMPT TO SOLVE PUZZLE
               </button>
 
               <div className="bg-white border border-slate-300 rounded-2xl p-4 shadow-md">
@@ -869,6 +872,44 @@ export default function App() {
                 </div>
               </div>
             </main>
+
+            {/* Solve Modal */}
+            {showPlayerSolveModal && (
+              <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                <div className="bg-white border border-slate-200 p-6 rounded-3xl w-full max-w-sm shadow-2xl">
+                  <h3 className="text-xl font-black text-[#003865] mb-2">Solve Training Puzzle</h3>
+                  <p className="text-xs text-slate-500 mb-4">Enter the full exact solution phrase below:</p>
+                  
+                  <input
+                    type="text"
+                    autoFocus
+                    value={localSolveInput}
+                    onChange={(e) => setLocalSolveInput(e.target.value)}
+                    placeholder="TYPE PHRASE HERE..."
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-[#003865] font-bold tracking-wider uppercase mb-4 focus:outline-none focus:border-[#005B2B]"
+                  />
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowPlayerSolveModal(false)}
+                      className="flex-1 py-3 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleSolveAttempt(localSolveInput);
+                        setShowPlayerSolveModal(false);
+                        setLocalSolveInput('');
+                      }}
+                      className="flex-1 py-3 bg-[#005B2B] text-white font-black rounded-xl text-xs shadow-lg"
+                    >
+                      Submit Solution
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <footer className="text-center text-[10px] text-slate-400 my-2">
               Washington County MN • Player Controller: {playerObj?.name}
