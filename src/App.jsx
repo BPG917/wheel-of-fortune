@@ -13,7 +13,7 @@ import {
 // ==========================================
 // Replace this object with your actual keys from the Firebase Console if you want real-time phone sync
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
+  apiKey: "AIzaSyAmN_TnyIkGLPicHuMx4ZIaSMRyMrnSwUc",
   authDomain: "wc-training-wheel.firebaseapp.com",
   projectId: "wc-training-wheel",
   storageBucket: "wc-training-wheel.firebasestorage.app",
