@@ -223,9 +223,11 @@ export default function App() {
     const unsubscribe = onSnapshot(gameDocRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        setGameState(data);
+        if (data && data.puzzles && data.players) {
+          setGameState(data);
+        }
       } else {
-        // Initialize doc in firestore if missing
+        // Only set default if document doesn't exist at all yet
         setDoc(gameDocRef, INITIAL_GAME_STATE).catch(() => {});
       }
     }, (err) => {
@@ -243,7 +245,9 @@ export default function App() {
       // Push to Firestore if configured
       if (db) {
         const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'current');
-        setDoc(gameDocRef, nextState, { merge: true }).catch(() => {});
+        setDoc(gameDocRef, nextState, { merge: true }).catch((err) => {
+          console.error("Error writing game state to Firebase:", err);
+        });
       }
 
       return nextState;
