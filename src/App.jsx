@@ -29,7 +29,7 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY") {
     firebaseApp = initializeApp(firebaseConfig);
     db = getFirestore(firebaseApp);
   } catch (e) {
-    console.warn('Firebase init error, using local fallback:', e);
+    console.warn('Firebase init error:', e);
   }
 }
 
@@ -79,9 +79,7 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 // WEB AUDIO SYNTHESIZER (NO EXTERNAL FILES)
 // ==========================================
 class SoundFX {
-  constructor() {
-    this.ctx = null;
-  }
+  ctx = null;
 
   init() {
     if (!this.ctx && typeof window !== 'undefined') {
@@ -193,6 +191,8 @@ class SoundFX {
 
 const sfx = new SoundFX();
 
+const ADMIN_SECRET = '1234';
+
 // ==========================================
 // MAIN COMPONENT & STATE MANAGER
 // ==========================================
@@ -200,63 +200,46 @@ export default function App() {
   const [viewMode, setViewMode] = useState('display'); // 'display', 'player', 'admin'
   const [selectedPlayerId, setSelectedPlayerId] = useState('player1');
   const [isPlayerSelected, setIsPlayerSelected] = useState(false);
-  const [gameState, setGameState] = useState(INITIAL_GAME_STATE);
-  
-  // Admin Local Form State
+  const [showPlayerSolveModal, setShowPlayerSolveModal] = useState(false);
+  const [localSolveInput, setLocalSolveInput] = useState('');
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [adminPasscode, setAdminPasscode] = useState('');
   const [adminPassError, setAdminPassError] = useState(false);
-  const [newPlayerName, setNewPlayerName] = useState('');
+  const [gameState, setGameState] = useState(INITIAL_GAME_STATE);
   const [newPuzzlePhrase, setNewPuzzlePhrase] = useState('');
   const [newPuzzleCategory, setNewPuzzleCategory] = useState('');
   const [newPuzzleHint, setNewPuzzleHint] = useState('');
-  const ADMIN_SECRET = '1234';
-
-  const [localSolveInput, setLocalSolveInput] = useState('');
-  const [showPlayerSolveModal, setShowPlayerSolveModal] = useState(false);
-
+  const [newPlayerName, setNewPlayerName] = useState('');
   const prevGameStateRef = useRef(gameState);
 
-  // Firestore Sync Effect
-  useEffect(() => {
-    if (!db) return;
-    const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'current');
-    
-    const unsubscribe = onSnapshot(gameDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data && data.puzzles && data.players) {
-          setGameState(data);
-        }
-      } else {
-        setDoc(gameDocRef, INITIAL_GAME_STATE).catch(() => {});
-      }
-    }, (err) => {
-      console.warn("Firestore sync error:", err);
-    });
+  // Dynamic calculation of current active puzzle & active player
+  const safeActiveIndex = (gameState.activePuzzleIndex >= 0 && gameState.activePuzzleIndex < (gameState.puzzles?.length || 0))
+    ? gameState.activePuzzleIndex 
+    : 0;
 
-    return () => unsubscribe();
-  }, []);
+  const currentPuzzle = gameState.puzzles?.[safeActiveIndex] || {
+    phrase: 'SAFETY FIRST ALWAYS',
+    category: 'WASHINGTON COUNTY CULTURE',
+    hint: 'Priority in the workplace'
+  };
 
-  // Sync state update function
-  const updateGame = async (updater) => {
+  const activePlayer = gameState.players?.[gameState.activePlayerIndex] || gameState.players?.[0] || { name: 'Player', color: '#005B2B' };
+
+  // Sync state update helper function
+  const updateGame = (updater) => {
     setGameState((prev) => {
       const nextState = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
-      
       if (db) {
         const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'current');
-        setDoc(gameDocRef, nextState, { merge: true }).catch((err) => {
-          console.error("Error writing game state to Firebase:", err);
-        });
+        setDoc(gameDocRef, nextState, { merge: true }).catch(() => {});
       }
-
       return nextState;
     });
   };
 
-  // Sound triggering on game state changes (Audio SFX plays across views)
+  // Sound triggering on game state changes (Only play on Display TV View)
   useEffect(() => {
-    if (!gameState.soundEnabled) return;
+    if (!gameState.soundEnabled || viewMode !== 'display') return;
     const prev = prevGameStateRef.current;
 
     if (prev.status === 'spinning' && gameState.status === 'landed') {
@@ -272,31 +255,36 @@ export default function App() {
     }
 
     prevGameStateRef.current = gameState;
-  }, [gameState]);
+  }, [gameState, viewMode]);
 
-  // Safe active puzzle lookup
-  const safeActiveIndex = Math.min(gameState.activePuzzleIndex || 0, Math.max((gameState.puzzles?.length || 1) - 1, 0));
-  const currentPuzzle = (gameState.puzzles && gameState.puzzles[safeActiveIndex]) ? gameState.puzzles[safeActiveIndex] : {
-    phrase: 'SAFETY FIRST ALWAYS',
-    category: 'WASHINGTON COUNTY CULTURE',
-    hint: 'Priority in the workplace'
-  };
+  // Firestore Sync Effect
+  useEffect(() => {
+    if (!db) return;
+    const gameDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'current');
+    
+    const unsubscribe = onSnapshot(gameDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setGameState(data);
+      }
+    }, (err) => {
+      console.warn("Firestore sync error:", err);
+    });
 
-  const activePlayer = gameState.players[gameState.activePlayerIndex] || gameState.players[0] || { name: 'Player', color: '#3B82F6' };
+    return () => unsubscribe();
+  }, []);
 
-  // ==========================================
-  // GAME ACTIONS
-  // ==========================================
-
+  // Spin Wheel Action
   const handleSpinWheel = () => {
     if (gameState.status !== 'idle' && gameState.status !== 'landed') return;
 
+    // Calculate spin wedge landing against 12 o'clock pointer
     const randomIndex = Math.floor(Math.random() * WHEEL_WEDGES.length);
-    const chosenWedge = WHEEL_WEDGES[randomIndex];
-    
     const wedgeAngle = 360 / WHEEL_WEDGES.length;
-    const targetDegrees = 360 * 6 + (WHEEL_WEDGES.length - randomIndex) * wedgeAngle;
-    const newTotalRotation = (gameState.wheelRotation || 0) + targetDegrees;
+    
+    // Calculate total rotation so wedge center stops directly under top arrow pointer
+    const targetDegrees = 360 * 6 + (WHEEL_WEDGES.length - randomIndex) * wedgeAngle - (wedgeAngle / 2);
+    const newTotalRotation = gameState.wheelRotation + targetDegrees;
 
     updateGame((prev) => ({
       ...prev,
@@ -305,7 +293,7 @@ export default function App() {
       lastActionText: `${activePlayer.name} is spinning the wheel...`
     }));
 
-    if (gameState.soundEnabled) {
+    if (gameState.soundEnabled && viewMode === 'display') {
       let ticks = 0;
       const interval = setInterval(() => {
         sfx.playTick();
@@ -316,17 +304,13 @@ export default function App() {
 
     setTimeout(() => {
       updateGame((prev) => {
-        const wedgeAngle = 360 / WHEEL_WEDGES.length;
-        const normalizedDeg = (360 - (newTotalRotation % 360)) % 360;
-        const landedIndex = Math.floor(normalizedDeg / wedgeAngle) % WHEEL_WEDGES.length;
-        const landedWedge = WHEEL_WEDGES[landedIndex] || chosenWedge;
-
-        let actionMsg = `${activePlayer.name} landed on $${landedWedge.label}! Select a letter.`;
+        const chosenWedge = WHEEL_WEDGES[randomIndex];
+        let actionMsg = `${activePlayer.name} landed on $${chosenWedge.label}! Select a letter.`;
         let nextStatus = 'landed';
         let updatedPlayers = [...prev.players];
         let nextPlayerIndex = prev.activePlayerIndex;
 
-        if (landedWedge.value === 'BANKRUPT') {
+        if (chosenWedge.value === 'BANKRUPT') {
           actionMsg = `OH NO! ${activePlayer.name} hit BANKRUPT! Lost turn and round earnings.`;
           updatedPlayers[prev.activePlayerIndex] = {
             ...updatedPlayers[prev.activePlayerIndex],
@@ -334,18 +318,18 @@ export default function App() {
           };
           nextPlayerIndex = (prev.activePlayerIndex + 1) % prev.players.length;
           nextStatus = 'idle';
-        } else if (landedWedge.value === 'LOSE_A_TURN') {
+        } else if (chosenWedge.value === 'LOSE_A_TURN') {
           actionMsg = `LOSE A TURN! ${activePlayer.name}'s turn is skipped.`;
           nextPlayerIndex = (prev.activePlayerIndex + 1) % prev.players.length;
           nextStatus = 'idle';
-        } else if (landedWedge.value === 'FREE_SPIN') {
+        } else if (chosenWedge.value === 'FREE_SPIN') {
           actionMsg = `FREE SPIN! ${activePlayer.name} gets an extra spin or letter call!`;
         }
 
         return {
           ...prev,
           status: nextStatus,
-          currentSpinValue: landedWedge.value,
+          currentSpinValue: chosenWedge.value,
           players: updatedPlayers,
           activePlayerIndex: nextPlayerIndex,
           lastActionText: actionMsg
@@ -368,7 +352,6 @@ export default function App() {
     }
 
     const nextGuessed = [...gameState.guessedLetters, letter];
-
     const uniquePhraseLetters = Array.from(new Set(phraseUpper.replace(/[^A-Z]/g, '')));
     const isPuzzleSolved = uniquePhraseLetters.every((l) => nextGuessed.includes(l));
 
@@ -381,9 +364,9 @@ export default function App() {
           ...updatedPlayers[prev.activePlayerIndex],
           score: updatedPlayers[prev.activePlayerIndex].score + pointsEarned
         };
-        if (gameState.soundEnabled) sfx.playDing();
+        if (gameState.soundEnabled && viewMode === 'display') sfx.playDing();
       } else {
-        if (gameState.soundEnabled) sfx.playBuzzer();
+        if (gameState.soundEnabled && viewMode === 'display') sfx.playBuzzer();
         nextPlayerIdx = (prev.activePlayerIndex + 1) % prev.players.length;
       }
 
@@ -433,7 +416,7 @@ export default function App() {
         };
       });
     } else {
-      if (gameState.soundEnabled) sfx.playBuzzer();
+      if (gameState.soundEnabled && viewMode === 'display') sfx.playBuzzer();
       updateGame((prev) => ({
         ...prev,
         activePlayerIndex: (prev.activePlayerIndex + 1) % prev.players.length,
