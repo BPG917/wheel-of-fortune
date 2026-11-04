@@ -274,18 +274,19 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Spin Wheel Action (Corrected math so chosen wedge stops dead-center under the 12 o'clock pointer)
+  // Spin Wheel Action (Corrected exact center wedge targeting at 12 o'clock pointer)
   const handleSpinWheel = () => {
     if (gameState.status !== 'idle' && gameState.status !== 'landed') return;
 
     // Pick random landing index
     const randomIndex = Math.floor(Math.random() * WHEEL_WEDGES.length);
-    const wedgeAngle = 360 / WHEEL_WEDGES.length;
+    const wedgeAngle = 360 / WHEEL_WEDGES.length; // 30 degrees per wedge
     
     // Wedge center angle relative to SVG 0 deg (3 o'clock East)
     const wedgeCenterAngle = (randomIndex + 0.5) * wedgeAngle;
     
-    // Pointer is at Top / 12 o'clock (270 deg in SVG polar space)
+    // Top pointer is at 12 o'clock (270 deg in SVG space).
+    // Target angle formula places the chosen wedge center directly under the top pointer arrow.
     const targetAngleAtTop = (270 - wedgeCenterAngle + 360) % 360;
     
     const currentRot = gameState.wheelRotation || 0;
@@ -295,7 +296,7 @@ export default function App() {
       distanceToTarget += 360;
     }
     
-    // Add 5 full spins (1800 deg) + exact clockwise distance to chosen wedge center
+    // Add 5 full spins (1800 deg) + exact clockwise distance
     const newTotalRotation = currentRot + 1800 + distanceToTarget;
 
     updateGame((prev) => ({
@@ -907,4 +908,305 @@ export default function App() {
             )}
 
             <footer className="text-center text-[10px] text-slate-400 my-2">
-              Washington County MN • Player Controller: {
+              Washington County MN • Player Controller: {playerObj?.name}
+            </footer>
+          </div>
+        )
+      )}
+
+      {/* 3. ADMIN PANEL VIEW */}
+      {viewMode === 'admin' && (
+        !isAdminUnlocked ? (
+          <div className="min-h-[80vh] flex items-center justify-center p-4">
+            <div className="bg-white border border-slate-200 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center">
+              <div className="w-16 h-16 bg-[#003865]/10 text-[#003865] rounded-2xl flex items-center justify-center mx-auto mb-4 border border-[#003865]/20">
+                <ShieldCheck className="w-10 h-10 text-[#005B2B]" />
+              </div>
+              <h2 className="text-2xl font-black text-[#003865] mb-2">Admin Panel Access</h2>
+              <p className="text-sm text-slate-500 mb-6">Enter host passcode to manage training puzzles and score overrides.</p>
+              
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (adminPasscode === ADMIN_SECRET) {
+                  setIsAdminUnlocked(true);
+                  setAdminPassError(false);
+                } else {
+                  setAdminPassError(true);
+                }
+              }}>
+                <input
+                  type="password"
+                  autoFocus
+                  value={adminPasscode}
+                  onChange={(e) => {
+                    setAdminPasscode(e.target.value);
+                    if (adminPassError) setAdminPassError(false);
+                  }}
+                  placeholder="Enter Passcode (1234)"
+                  className={`w-full text-center text-2xl font-bold tracking-widest bg-slate-50 border rounded-2xl p-4 mb-4 focus:outline-none ${
+                    adminPassError ? 'border-rose-500 bg-rose-50 text-rose-900' : 'border-slate-300 focus:border-[#005B2B] text-[#003865]'
+                  }`}
+                />
+
+                {adminPassError && (
+                  <p className="text-xs text-rose-600 font-bold mb-4 flex items-center justify-center gap-1">
+                    <AlertTriangle className="w-4 h-4" /> Incorrect Passcode. Try again.
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full py-4 bg-[#005B2B] hover:bg-[#003865] text-white font-black rounded-2xl shadow-lg transition"
+                >
+                  UNLOCK ADMIN PANEL
+                </button>
+              </form>
+            </div>
+          </div>
+        ) : (
+          <div className="min-h-screen bg-[#F8F9FA] text-[#1A202C] p-4 sm:p-8 font-sans max-w-6xl mx-auto">
+            <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-300 pb-6 mb-8 gap-4">
+              <div>
+                <h1 className="text-3xl font-black text-[#003865] flex items-center gap-3">
+                  <ShieldCheck className="w-8 h-8 text-[#005B2B]" />
+                  Washington County Admin Panel
+                </h1>
+                <p className="text-sm text-slate-600">Manage training puzzles, turns, and scores live for employee sessions.</p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleNextRound}
+                  className="px-4 py-2.5 bg-[#005B2B] hover:bg-[#003865] text-white font-bold rounded-xl flex items-center gap-2 shadow-md transition"
+                >
+                  <RefreshCw className="w-4 h-4" /> Next Puzzle / Reset Round
+                </button>
+                <button
+                  onClick={() => {
+                    setIsAdminUnlocked(false);
+                    setAdminPasscode('');
+                  }}
+                  className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl flex items-center gap-2 shadow-sm transition text-xs"
+                >
+                  Lock Admin
+                </button>
+              </div>
+            </header>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              <div className="lg:col-span-7 space-y-6">
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md">
+                  <h2 className="text-lg font-bold text-[#003865] mb-4 flex items-center gap-2">
+                    <Play className="w-5 h-5 text-[#005B2B]" /> Puzzle Bank Management ({gameState.puzzles.length})
+                  </h2>
+
+                  <div className="space-y-3">
+                    {gameState.puzzles.map((p, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-4 rounded-xl border flex items-center justify-between gap-3 ${
+                          gameState.activePuzzleIndex === idx
+                            ? 'bg-[#005B2B]/10 border-[#005B2B] text-[#003865]'
+                            : 'bg-slate-50 border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <span className="text-xs font-extrabold uppercase text-[#005B2B] block">{p.category}</span>
+                          <span className="font-extrabold text-base text-[#003865] break-words">{p.phrase}</span>
+                          {p.hint && <span className="text-xs text-slate-500 block italic">Hint: {p.hint}</span>}
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {gameState.activePuzzleIndex !== idx ? (
+                            <button
+                              onClick={() => updateGame({ activePuzzleIndex: idx, guessedLetters: [], status: 'idle' })}
+                              className="px-3 py-1.5 bg-[#003865] hover:bg-[#008EAA] text-xs font-bold rounded-lg text-white"
+                            >
+                              Activate
+                            </button>
+                          ) : (
+                            <span className="px-2.5 py-1 bg-[#005B2B] text-white text-[10px] font-black rounded-lg">ACTIVE</span>
+                          )}
+
+                          <button
+                            onClick={() => handleDeletePuzzle(idx)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 transition"
+                            title="Delete Puzzle from Bank"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md">
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-bold text-[#003865] flex items-center gap-2">
+                      <Award className="w-5 h-5 text-[#005B2B]" /> Player Roster ({gameState.players.length}/8)
+                    </h2>
+                  </div>
+
+                  <form onSubmit={handleAddPlayerSubmit} className="flex gap-2 mb-4">
+                    <input
+                      type="text"
+                      value={newPlayerName}
+                      onChange={(e) => setNewPlayerName(e.target.value)}
+                      placeholder="Enter new player name..."
+                      className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-[#003865] font-bold focus:outline-none focus:border-[#005B2B]"
+                    />
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-[#005B2B] hover:bg-[#003865] text-white text-xs font-bold rounded-xl shadow"
+                    >
+                      + Add Player
+                    </button>
+                  </form>
+
+                  <div className="space-y-3">
+                    {gameState.players.map((player, idx) => {
+                      const isActive = idx === gameState.activePlayerIndex;
+
+                      return (
+                        <div key={player.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: player.color }} />
+                            <div>
+                              <input
+                                type="text"
+                                value={player.name}
+                                onChange={(e) => {
+                                  const newName = e.target.value;
+                                  updateGame((prev) => {
+                                    const copy = [...prev.players];
+                                    copy[idx].name = newName;
+                                    return { ...prev, players: copy };
+                                  });
+                                }}
+                                className="font-bold text-[#003865] bg-transparent border-b border-dashed border-slate-400 focus:outline-none focus:border-[#005B2B]"
+                              />
+                              {isActive && <span className="ml-2 text-[10px] bg-[#78BE21] text-[#003865] px-2 py-0.5 rounded font-black">ACTIVE TURN</span>}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <span className="text-[10px] text-slate-500 block">Round Score</span>
+                              <input
+                                type="number"
+                                value={player.score}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value) || 0;
+                                  updateGame((prev) => {
+                                    const copy = [...prev.players];
+                                    copy[idx].score = val;
+                                    return { ...prev, players: copy };
+                                  });
+                                }}
+                                className="w-20 bg-white border border-slate-300 text-[#005B2B] font-bold text-sm px-2 py-1 rounded text-right"
+                              />
+                            </div>
+
+                            {!isActive && (
+                              <button
+                                onClick={() => updateGame({ activePlayerIndex: idx })}
+                                className="px-3 py-1.5 bg-[#003865] hover:bg-[#008EAA] text-xs font-bold rounded-lg text-white"
+                              >
+                                Set Turn
+                              </button>
+                            )}
+                            
+                            {gameState.players.length > 2 && (
+                              <button
+                                onClick={() => {
+                                  updateGame((prev) => ({
+                                    ...prev,
+                                    players: prev.players.filter((_, pIdx) => pIdx !== idx),
+                                    activePlayerIndex: 0
+                                  }));
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 transition"
+                                title="Remove Player"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="lg:col-span-5 space-y-6">
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md">
+                  <h2 className="text-lg font-bold text-[#003865] mb-4 flex items-center gap-2">
+                    <Plus className="w-5 h-5 text-[#005B2B]" /> Add New Training Puzzle
+                  </h2>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs text-slate-500 font-semibold uppercase block mb-1">Puzzle Phrase</label>
+                      <input
+                        type="text"
+                        value={newPuzzlePhrase}
+                        onChange={(e) => setNewPuzzlePhrase(e.target.value)}
+                        placeholder="e.g. QUALITY ASSURANCE"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-[#003865] font-bold tracking-wider uppercase focus:outline-none focus:border-[#005B2B]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 font-semibold uppercase block mb-1">Category</label>
+                      <input
+                        type="text"
+                        value={newPuzzleCategory}
+                        onChange={(e) => setNewPuzzleCategory(e.target.value)}
+                        placeholder="e.g. DEPT GOALS"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-[#003865] font-bold uppercase focus:outline-none focus:border-[#005B2B]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 font-semibold uppercase block mb-1">Hint (Optional)</label>
+                      <input
+                        type="text"
+                        value={newPuzzleHint}
+                        onChange={(e) => setNewPuzzleHint(e.target.value)}
+                        placeholder="e.g. Key milestone for Q3"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-slate-700 text-sm focus:outline-none focus:border-[#005B2B]"
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (!newPuzzlePhrase || !newPuzzleCategory) return;
+                        const newEntry = {
+                          phrase: newPuzzlePhrase.trim().toUpperCase(),
+                          category: newPuzzleCategory.trim().toUpperCase(),
+                          hint: newPuzzleHint.trim()
+                        };
+                        updateGame((prev) => ({
+                          ...prev,
+                          puzzles: [...prev.puzzles, newEntry]
+                        }));
+                        setNewPuzzlePhrase('');
+                        setNewPuzzleCategory('');
+                        setNewPuzzleHint('');
+                      }}
+                      className="w-full py-3 bg-[#005B2B] hover:bg-[#003865] text-white font-black rounded-xl shadow-md transition"
+                    >
+                      ADD PUZZLE TO BANK
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
