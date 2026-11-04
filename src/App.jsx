@@ -274,28 +274,28 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Spin Wheel Action (Corrected angle alignment to match top 12 o'clock pointer)
+  // Spin Wheel Action (Corrected math so chosen wedge stops dead-center under the 12 o'clock pointer)
   const handleSpinWheel = () => {
     if (gameState.status !== 'idle' && gameState.status !== 'landed') return;
 
-    // Calculate spin wedge landing against 12 o'clock top pointer
+    // Pick random landing index
     const randomIndex = Math.floor(Math.random() * WHEEL_WEDGES.length);
     const wedgeAngle = 360 / WHEEL_WEDGES.length;
     
-    // SVG 0deg starts at 3 o'clock (90deg East). 
-    // Top pointer is at 12 o'clock (270deg / -90deg North).
-    // Correct total rotation formula accounting for 90-degree initial SVG offset:
-    const baseWedgeAngle = randomIndex * wedgeAngle + (wedgeAngle / 2);
-    const targetAngleAtTop = (360 - baseWedgeAngle - 90 + 360) % 360;
+    // Wedge center angle relative to SVG 0 deg (3 o'clock East)
+    const wedgeCenterAngle = (randomIndex + 0.5) * wedgeAngle;
+    
+    // Pointer is at Top / 12 o'clock (270 deg in SVG polar space)
+    const targetAngleAtTop = (270 - wedgeCenterAngle + 360) % 360;
     
     const currentRot = gameState.wheelRotation || 0;
-    const currentNormalized = currentRot % 360;
+    const currentNormalized = ((currentRot % 360) + 360) % 360;
     let distanceToTarget = targetAngleAtTop - currentNormalized;
     if (distanceToTarget <= 0) {
       distanceToTarget += 360;
     }
     
-    // Add 5 full rotations (1800 deg) + exact distance to target wedge center at top
+    // Add 5 full spins (1800 deg) + exact clockwise distance to chosen wedge center
     const newTotalRotation = currentRot + 1800 + distanceToTarget;
 
     updateGame((prev) => ({
@@ -784,4 +784,127 @@ export default function App() {
               
               <div className="flex items-center gap-3 bg-[#071927] p-3 rounded-xl border border-white/10 mb-3">
                 <span className="w-4 h-4 rounded-full" style={{ backgroundColor: playerObj?.color }} />
-                <span className="font-
+                <span className="font-black text-lg text-white">{playerObj?.name}</span>
+              </div>
+
+              <div className="flex justify-between items-center border-t border-white/20 pt-3">
+                <div>
+                  <span className="text-xs text-slate-200 block">Round Score</span>
+                  <span className="text-2xl font-black text-[#78BE21]">${playerObj?.score || 0}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-slate-200 block">Total Score</span>
+                  <span className="text-lg font-bold text-white">${playerObj?.totalScore || 0}</span>
+                </div>
+              </div>
+            </header>
+
+            <div className={`my-4 p-4 rounded-2xl border text-center transition ${
+              isMyTurn 
+                ? 'bg-[#005B2B] border-[#78BE21] text-white shadow-lg'
+                : 'bg-white border-slate-300 text-slate-600 shadow-sm'
+            }`}>
+              <div className={`text-xs font-bold uppercase tracking-wider mb-1 ${isMyTurn ? 'text-[#78BE21]' : 'text-slate-500'}`}>
+                {isMyTurn ? "IT'S YOUR TURN!" : `WAITING FOR ${activePlayer.name}`}
+              </div>
+              <p className="text-sm font-medium">{gameState.lastActionText}</p>
+            </div>
+
+            <main className="flex-1 flex flex-col justify-center gap-3 my-2">
+              <button
+                onClick={handleSpinWheel}
+                disabled={!canSpin}
+                className={`w-full py-5 rounded-2xl font-black text-2xl flex items-center justify-center gap-3 shadow-xl transition transform active:scale-95 ${
+                  canSpin
+                    ? 'bg-[#005B2B] text-white hover:bg-[#003865] shadow-green-900/20'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
+                }`}
+              >
+                <RotateCw className={`w-7 h-7 ${gameState.status === 'spinning' ? 'animate-spin' : ''}`} />
+                SPIN WHEEL
+              </button>
+
+              <button
+                onClick={() => setShowPlayerSolveModal(true)}
+                disabled={!isMyTurn || gameState.status === 'spinning'}
+                className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border transition ${
+                  isMyTurn && gameState.status !== 'spinning'
+                    ? 'bg-[#003865] hover:bg-[#008EAA] text-white border-transparent'
+                    : 'bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed'
+                }`}
+              >
+                <Sparkles className="w-4 h-4 text-[#78BE21]" />
+                ATTEMPT TO SOLVE PUZZLE
+              </button>
+
+              <div className="bg-white border border-slate-300 rounded-2xl p-4 shadow-md">
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 text-center">
+                  {canPickLetter ? "SELECT A LETTER" : "LETTER KEYBOARD (SPIN FIRST)"}
+                </div>
+                
+                <div className="grid grid-cols-7 gap-1.5">
+                  {ALPHABET.map((char) => {
+                    const isUsed = gameState.guessedLetters.includes(char);
+                    const disabled = !canPickLetter || isUsed;
+
+                    return (
+                      <button
+                        key={char}
+                        onClick={() => handleSelectLetter(char)}
+                        disabled={disabled}
+                        className={`h-11 rounded-lg font-black text-lg transition flex items-center justify-center border ${
+                          isUsed
+                            ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed'
+                            : canPickLetter
+                            ? 'bg-[#003865] text-white border-[#008EAA] hover:bg-[#005B2B] hover:scale-105 shadow active:scale-95'
+                            : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                        }`}
+                      >
+                        {char}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </main>
+
+            {/* Solve Modal */}
+            {showPlayerSolveModal && (
+              <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                <div className="bg-white border border-slate-200 p-6 rounded-3xl w-full max-w-sm shadow-2xl">
+                  <h3 className="text-xl font-black text-[#003865] mb-2">Solve Training Puzzle</h3>
+                  <p className="text-xs text-slate-500 mb-4">Enter the full exact solution phrase below:</p>
+                  
+                  <input
+                    type="text"
+                    autoFocus
+                    value={localSolveInput}
+                    onChange={(e) => setLocalSolveInput(e.target.value)}
+                    placeholder="TYPE PHRASE HERE..."
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-[#003865] font-bold tracking-wider uppercase mb-4 focus:outline-none focus:border-[#005B2B]"
+                  />
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowPlayerSolveModal(false)}
+                      className="flex-1 py-3 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleSolveAttempt(localSolveInput);
+                        setShowPlayerSolveModal(false);
+                        setLocalSolveInput('');
+                      }}
+                      className="flex-1 py-3 bg-[#005B2B] text-white font-black rounded-xl text-xs shadow-lg"
+                    >
+                      Submit Solution
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <footer className="text-center text-[10px] text-slate-400 my-2">
+              Washington County MN • Player Controller: {
