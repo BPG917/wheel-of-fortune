@@ -84,7 +84,7 @@ class SoundFX {
   init() {
     if (typeof window === 'undefined') return;
     if (!this.ctx) {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const AudioCtx = window.AudioContext || (window).webkitAudioContext;
       if (AudioCtx) {
         this.ctx = new AudioCtx();
       }
@@ -98,17 +98,18 @@ class SoundFX {
     this.init();
     if (!this.ctx) return;
     try {
+      const now = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(600, this.ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(120, this.ctx.currentTime + 0.04);
-      gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.04);
+      osc.frequency.setValueAtTime(800, now);
+      osc.frequency.exponentialRampToValueAtTime(150, now + 0.05);
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
       osc.connect(gain);
       gain.connect(this.ctx.destination);
-      osc.start();
-      osc.stop(this.ctx.currentTime + 0.04);
+      osc.start(now);
+      osc.stop(now + 0.05);
     } catch (e) {}
   }
 
@@ -291,6 +292,9 @@ export default function App() {
   const handleSpinWheel = () => {
     if (gameState.status !== 'idle' && gameState.status !== 'landed') return;
 
+    // Ensure Audio Context is active on user click for Safari
+    sfx.init();
+
     const randomIndex = Math.floor(Math.random() * WHEEL_WEDGES.length);
     const wedgeAngle = 360 / WHEEL_WEDGES.length;
     
@@ -313,13 +317,20 @@ export default function App() {
       lastActionText: `${activePlayer.name} is spinning the wheel...`
     }));
 
-    if (gameState.soundEnabled && viewMode === 'display') {
-      let ticks = 0;
-      const interval = setInterval(() => {
+    // Ticking audio loop during wheel rotation (plays on both local player and TV view)
+    if (gameState.soundEnabled) {
+      let tickCount = 0;
+      const totalTicks = 24;
+      const playNextTick = () => {
         sfx.playTick();
-        ticks++;
-        if (ticks > 22) clearInterval(interval);
-      }, 130);
+        tickCount++;
+        if (tickCount < totalTicks) {
+          // Progressively slow down ticks as wheel comes to a stop
+          const delay = 80 + Math.pow(tickCount / totalTicks, 2) * 200;
+          setTimeout(playNextTick, delay);
+        }
+      };
+      playNextTick();
     }
 
     setTimeout(() => {
