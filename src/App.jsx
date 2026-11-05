@@ -217,14 +217,14 @@ export default function App() {
   useEffect(() => {
     const unlockAudio = () => {
       sfx.init();
-      window.removeEventListener('click', unlockAudio);
-      window.removeEventListener('keydown', unlockAudio);
     };
     window.addEventListener('click', unlockAudio);
     window.addEventListener('keydown', unlockAudio);
+    window.addEventListener('touchstart', unlockAudio);
     return () => {
       window.removeEventListener('click', unlockAudio);
       window.removeEventListener('keydown', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
     };
   }, []);
 
@@ -240,10 +240,13 @@ export default function App() {
     });
   };
 
-  // Sound triggering effect
+  // Sound triggering effect - keep AudioContext active on turn change
   useEffect(() => {
     if (!gameState.soundEnabled || viewMode !== 'display') return;
     const prev = prevGameStateRef.current;
+
+    // Always ensure audio context is resumed on TV view when game state changes
+    sfx.init();
 
     if (prev.status === 'spinning' && gameState.status === 'landed') {
       if (gameState.currentSpinValue === 'BANKRUPT' || gameState.currentSpinValue === 'LOSE_A_TURN') {
@@ -288,11 +291,12 @@ export default function App() {
 
   const activePlayer = gameState.players?.[gameState.activePlayerIndex] || gameState.players?.[0] || { name: 'Player', color: '#005B2B' };
 
-  // Spin Wheel Action
-  const handleSpinWheel = () => {
+  // Spin Wheel Action - Explicit User Click Guard
+  const handleSpinWheel = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
     if (gameState.status !== 'idle' && gameState.status !== 'landed') return;
 
-    // Ensure Audio Context is active on user click for Safari
+    // Ensure Audio Context is active on user click
     sfx.init();
 
     const randomIndex = Math.floor(Math.random() * WHEEL_WEDGES.length);
@@ -317,7 +321,7 @@ export default function App() {
       lastActionText: `${activePlayer.name} is spinning the wheel...`
     }));
 
-    // Ticking audio loop during wheel rotation (plays on both local player and TV view)
+    // Ticking audio loop during wheel rotation
     if (gameState.soundEnabled) {
       let tickCount = 0;
       const totalTicks = 24;
@@ -325,7 +329,6 @@ export default function App() {
         sfx.playTick();
         tickCount++;
         if (tickCount < totalTicks) {
-          // Progressively slow down ticks as wheel comes to a stop
           const delay = 80 + Math.pow(tickCount / totalTicks, 2) * 200;
           setTimeout(playNextTick, delay);
         }
@@ -612,12 +615,19 @@ export default function App() {
               ))}
             </div>
 
-            <button
-              onClick={handleRestartGame}
-              className="w-full py-4 bg-[#78BE21] hover:bg-[#005B2B] text-[#003865] hover:text-white font-black text-lg rounded-2xl shadow-xl transition transform active:scale-95"
-            >
-              START NEW TOURNAMENT
-            </button>
+            {/* Only allow restarting the game from TV Display or Admin view */}
+            {viewMode !== 'player' ? (
+              <button
+                onClick={handleRestartGame}
+                className="w-full py-4 bg-[#78BE21] hover:bg-[#005B2B] text-[#003865] hover:text-white font-black text-lg rounded-2xl shadow-xl transition transform active:scale-95"
+              >
+                START NEW TOURNAMENT
+              </button>
+            ) : (
+              <div className="p-4 bg-[#071927] rounded-xl border border-slate-700 text-slate-300 text-xs font-bold">
+                🏆 Tournament Finished! Waiting for host to start a new tournament on the main display.
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -855,7 +865,10 @@ export default function App() {
                     {gameState.players.map((p) => (
                       <button
                         key={p.id}
-                        onClick={() => {
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           setSelectedPlayerId(p.id);
                           setIsPlayerSelected(true);
                         }}
@@ -916,7 +929,8 @@ export default function App() {
 
                 <main className="flex-1 flex flex-col justify-center gap-3 my-2">
                   <button
-                    onClick={handleSpinWheel}
+                    type="button"
+                    onClick={(e) => handleSpinWheel(e)}
                     disabled={!canSpin}
                     className={`w-full py-5 rounded-2xl font-black text-2xl flex items-center justify-center gap-3 shadow-xl transition transform active:scale-95 ${
                       canSpin
