@@ -42,21 +42,21 @@ const INITIAL_GAME_STATE = {
     { phrase: 'EXCELLENT CUSTOMER SERVICE', category: 'CORE VALUES', hint: 'Our main client goal' },
     { phrase: 'CONTINUOUS IMPROVEMENT', category: 'LEAN METHODOLOGY', hint: 'Kaizen mindset' }
   ],
-  guessedLetters: [], // e.g. ['A', 'B', 'S']
+  guessedLetters: [],
   players: [
     { id: 'player1', name: 'Alex', score: 0, totalScore: 0, color: '#005B2B' },
     { id: 'player2', name: 'Jordan', score: 0, totalScore: 0, color: '#003865' },
     { id: 'player3', name: 'Taylor', score: 0, totalScore: 0, color: '#008EAA' }
   ],
   activePlayerIndex: 0,
-  currentSpinValue: null, // number or 'BANKRUPT' or 'LOSE_A_TURN'
-  wheelRotation: 0, // degrees
+  currentSpinValue: null,
+  wheelRotation: 0,
   lastActionText: 'Welcome to Washington County Training Wheel! Press Start Game in Admin.',
   soundEnabled: true,
   solveAttempt: null
 };
 
-// Wheel wedges config (Free Spin removed for streamlined gameplay)
+// Wheel wedges config (Free Spin completely replaced with 800)
 const WHEEL_WEDGES = [
   { label: '500', value: 500, color: '#005B2B', text: '#ffffff' },
   { label: 'BANKRUPT', value: 'BANKRUPT', color: '#1a202c', text: '#ef4444' },
@@ -66,8 +66,8 @@ const WHEEL_WEDGES = [
   { label: '1000', value: 1000, color: '#008EAA', text: '#ffffff' },
   { label: '100', value: 100, color: '#005B2B', text: '#ffffff' },
   { label: '2000', value: 2000, color: '#78BE21', text: '#003865' },
-  { label: '300', value: 300, color: '#008EAA', text: '#ffffff' },
   { label: '800', value: 800, color: '#003865', text: '#ffffff' },
+  { label: '300', value: 300, color: '#008EAA', text: '#ffffff' },
   { label: '400', value: 400, color: '#005B2B', text: '#ffffff' },
   { label: '1500', value: 1500, color: '#78BE21', text: '#003865' }
 ];
@@ -82,7 +82,8 @@ class SoundFX {
   ctx = null;
 
   init() {
-    if (!this.ctx && typeof window !== 'undefined') {
+    if (typeof window === 'undefined') return;
+    if (!this.ctx) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (AudioCtx) {
         this.ctx = new AudioCtx();
@@ -293,10 +294,7 @@ export default function App() {
     const randomIndex = Math.floor(Math.random() * WHEEL_WEDGES.length);
     const wedgeAngle = 360 / WHEEL_WEDGES.length;
     
-    // Exact center angle of chosen wedge relative to SVG 3 o'clock (0deg)
     const wedgeCenterAngle = (randomIndex + 0.5) * wedgeAngle;
-    
-    // Pointer is at Top / 12 o'clock (270 deg)
     const targetAngleAtTop = (270 - wedgeCenterAngle + 360) % 360;
     
     const currentRot = gameState.wheelRotation || 0;
@@ -645,11 +643,15 @@ export default function App() {
 
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => updateGame({ soundEnabled: !gameState.soundEnabled })}
-                    className="p-2.5 rounded-xl bg-[#003865] hover:bg-[#008EAA] text-white border border-slate-700 transition"
-                    title="Toggle Audio SFX"
+                    onClick={() => {
+                      sfx.init();
+                      updateGame({ soundEnabled: !gameState.soundEnabled });
+                    }}
+                    className="px-3 py-2 rounded-xl bg-[#005B2B] hover:bg-[#78BE21] hover:text-[#003865] text-white font-bold text-xs border border-[#78BE21]/40 transition flex items-center gap-1.5 shadow"
+                    title="Click to enable Safari sound"
                   >
-                    {gameState.soundEnabled ? <Volume2 className="w-5 h-5 text-[#78BE21]" /> : <VolumeX className="w-5 h-5 text-rose-400" />}
+                    {gameState.soundEnabled ? <Volume2 className="w-4 h-4 text-[#78BE21]" /> : <VolumeX className="w-4 h-4 text-rose-400" />}
+                    <span>{gameState.soundEnabled ? 'Audio ON (Safari)' : 'Audio OFF'}</span>
                   </button>
                   <div className="text-xs font-mono bg-[#071927] px-3 py-2 rounded-xl text-slate-300 border border-[#003865]">
                     ROUND {gameState.activePuzzleIndex + 1} / {gameState.puzzles.length}
@@ -690,11 +692,23 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* Status Log & Round Advance Callout */}
                   <div className="mt-6 w-full bg-[#003865]/80 border border-[#008EAA]/40 rounded-2xl p-4 text-center shadow-lg">
                     <div className="text-xs font-bold text-[#78BE21] uppercase tracking-wider mb-1">Status Log</div>
                     <div className="text-lg sm:text-xl font-bold text-white animate-pulse">
                       {gameState.lastActionText}
                     </div>
+
+                    {gameState.status === 'solved' && (
+                      <div className="mt-3 pt-3 border-t border-slate-700/60 flex justify-center">
+                        <button
+                          onClick={handleNextRound}
+                          className="px-6 py-2.5 bg-[#78BE21] hover:bg-[#005B2B] text-[#003865] hover:text-white font-black text-sm rounded-xl shadow-lg transition"
+                        >
+                          ADVANCE TO NEXT PUZZLE →
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
